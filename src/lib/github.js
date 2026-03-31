@@ -129,21 +129,21 @@ export function detectPages(tree) {
     const parts = f.path.split('/')
     const filename = parts[parts.length - 1]
     const name = filename.replace(pageExt, '')
-    // Always skip known non-page names
-    if (SKIP_NAMES.test(name)) return false
+    // Always skip known non-page names (but "page" is a Next.js App Router convention — keep it)
+    if (SKIP_NAMES.test(name) && name.toLowerCase() !== 'page') return false
     // Skip React/Vue component-like names (PascalCase + UI suffix)
     if (SKIP_COMPONENT.test(name)) return false
     // Skip common app dashboard names
     if (SKIP_APP_NAMES.test(name)) return false
     // Root-level HTML files are always content pages
     if (parts.length === 1 && /\.html$/.test(filename)) return true
+    // Next.js App Router: app/**/page.jsx — always include
+    if (name.toLowerCase() === 'page') return true
     // Files in pages/ or app/ dirs — include only if they look like content, not components
     const inPageDir = /\b(pages?|app|views?|routes?)\b/i.test(f.path.replace(filename, ''))
     if (inPageDir) {
-      // In a pages dir, only include lowercase/kebab-case names (real routes) or index files
       if (/^(index|home|about|contact|blog|faq|pricing|services|portfolio|terms|privacy|404|500)$/i.test(name)) return true
-      if (/^[a-z][a-z0-9-]*$/.test(name)) return true // kebab-case route like "about-us"
-      // Skip PascalCase names in pages dirs — likely React components not content pages
+      if (/^[a-z][a-z0-9-]*$/.test(name)) return true
       if (/^[A-Z]/.test(name)) return false
       return true
     }
@@ -160,10 +160,19 @@ export function detectPages(tree) {
     const filename = parts[parts.length - 1]
     const name = filename.replace(pageExt, '')
 
-    let label = name
-      .replace(/[-_]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .replace(/^Index$/, 'Home')
+    let label
+    // Next.js App Router: app/about/page.tsx → label from parent directory
+    if (name.toLowerCase() === 'page' && parts.length >= 2) {
+      const parentDir = parts[parts.length - 2]
+      // If parent is 'app' itself, this is the root page → Home
+      label = parentDir.toLowerCase() === 'app' ? 'Home'
+        : parentDir.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    } else {
+      label = name
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .replace(/^Index$/, 'Home')
+    }
 
     if (seen.has(f.path)) continue
     seen.add(f.path)
@@ -183,12 +192,20 @@ export function extractContentFromSource(content, filePath) {
   const norm = (s) => s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
   // Reject strings that look like JS variable references rather than real content
   const isReal = (s) => s && !/^[a-z_$][a-z0-9_.|\s]*$/i.test(s) && s.length > 1
+  // Reject strings that contain JS code patterns
+  const hasCode = (s) => /\b(const |let |var |function |=>|import |require\(|\{\{|\}\}|\.map\(|\.filter\(|\.forEach\()/.test(s)
   const isRealUrl = (s) => s && /^https?:\/\//.test(s)
 
-  // Strip script/style blocks to avoid false matches
+  // Strip script/style blocks and JS code to avoid false matches
   const clean = content
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
+    // Strip JSX expressions { ... } that span code
+    .replace(/\{(?:\/\*[\s\S]*?\*\/|[^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, ' ')
+    // Strip single-line JS comments
+    .replace(/\/\/[^\n]*/g, '')
+    // Strip multi-line JS comments
+    .replace(/\/\*[\s\S]*?\*\//g, '')
 
   // HTML-like files
   if (['html', 'astro', 'svelte', 'vue'].includes(ext)) {
@@ -204,7 +221,7 @@ export function extractContentFromSource(content, filePath) {
     const pAll = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
     for (const m of pAll) {
       const txt = norm(m[1])
-      if (txt.length > 15 && isReal(txt)) { result.bodyText = txt; break }
+      if (txt.length > 15 && isReal(txt) && !hasCode(txt)) { result.bodyText = txt; break }
     }
 
     const imgAll = [...clean.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)]
@@ -230,7 +247,7 @@ export function extractContentFromSource(content, filePath) {
     const pAll = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
     for (const m of pAll) {
       const txt = norm(m[1])
-      if (txt.length > 15 && isReal(txt)) { result.bodyText = txt; break }
+      if (txt.length > 15 && isReal(txt) && !hasCode(txt)) { result.bodyText = txt; break }
     }
 
     const imgAll = [...clean.matchAll(/<img[^>]+src=["'{]([^"'}]+)["'}][^>]*\/?>/gi)]
