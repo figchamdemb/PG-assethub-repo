@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react'
 import { listAssets, deleteAsset, uploadAsset, formatBytes } from '../lib/storage.js'
+import { isGitHubConnected, listRepos, getRepoTree } from '../lib/github.js'
 import config from '../config.js'
+
+const IMG_EXT = /\.(png|jpg|jpeg|gif|svg|webp|ico|avif|bmp)$/i
+
+function guessAssetType(path) {
+  const lower = path.toLowerCase()
+  if (/logo/i.test(lower)) return 'logo'
+  if (/hero|banner/i.test(lower)) return 'hero-banner'
+  if (/icon|favicon/i.test(lower)) return 'icon'
+  if (/bg|background|texture/i.test(lower)) return 'background'
+  if (/thumb/i.test(lower)) return 'thumbnail'
+  if (/product/i.test(lower)) return 'product'
+  if (/gallery/i.test(lower)) return 'gallery'
+  return 'other'
+}
 
 export default function AssetsTab({ project }) {
   const [assets, setAssets] = useState([])
@@ -10,9 +25,17 @@ export default function AssetsTab({ project }) {
   const [viewAsset, setViewAsset] = useState(null)
   const [copied, setCopied] = useState(null)
   const [replaceAsset, setReplaceAsset] = useState(null)
+  const [repoAssets, setRepoAssets] = useState([])
+  const [repos, setRepos] = useState([])
+  const [selectedRepo, setSelectedRepo] = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
+  const [tab, setTab] = useState('uploaded') // 'uploaded' | 'repo'
 
   useEffect(() => {
     loadAssets()
+    if (isGitHubConnected()) {
+      listRepos().then(r => setRepos(r)).catch(() => {})
+    }
   }, [project])
 
   async function loadAssets() {
@@ -27,6 +50,36 @@ export default function AssetsTab({ project }) {
     setLoading(false)
   }
 
+  async function handleScanRepo() {
+    if (!selectedRepo) return
+    setScanLoading(true)
+    try {
+      const tree = await getRepoTree(selectedRepo)
+      const images = tree
+        .filter(f => f.type === 'blob' && IMG_EXT.test(f.path))
+        .map(f => {
+          const parts = f.path.split('/')
+          const filename = parts[parts.length - 1]
+          const ext = (filename.split('.').pop() || '').toLowerCase()
+          return {
+            key: 'repo:' + f.path,
+            name: filename,
+            path: f.path,
+            assetType: guessAssetType(f.path),
+            format: ext,
+            size: f.size || 0,
+            url: `https://raw.githubusercontent.com/${selectedRepo}/main/${f.path}`,
+            source: 'repo',
+          }
+        })
+      setRepoAssets(images)
+      setTab('repo')
+    } catch (e) {
+      alert('Could not scan repo: ' + e.message)
+    }
+    setScanLoading(false)
+  }
+
   const filtered = assets.filter(a => {
     const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
       a.assetType.toLowerCase().includes(search.toLowerCase())
@@ -34,6 +87,14 @@ export default function AssetsTab({ project }) {
     return matchSearch && matchType
   })
 
+  const filteredRepo = repoAssets.filter(a => {
+    const matchSearch = a.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.path.toLowerCase().includes(search.toLowerCase())
+    const matchType = filterType === 'all' || a.assetType === filterType
+    return matchSearch && matchType
+  })
+
+  const displayAssets = tab === 'repo' ? filteredRepo : filtered
   const totalSize = assets.reduce((s, a) => s + (a.size || 0), 0)
 
   async function handleDelete(asset) {
@@ -70,15 +131,36 @@ export default function AssetsTab({ project }) {
       {/* Stats */}
       <div style={styles.statsRow}>
         {[
-          { label: 'Total assets', value: assets.length },
+          { label: 'Uploaded assets', value: assets.length },
+          { label: 'Repo images', value: repoAssets.length || '—' },
           { label: 'Total size', value: formatBytes(totalSize) },
-          { label: 'Last upload', value: assets.length ? timeAgo(assets[0]?.uploadedAt) : '—' },
         ].map(s => (
           <div key={s.label} style={styles.stat}>
             <div style={styles.statLabel}>{s.label}</div>
             <div style={styles.statVal}>{s.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Tabs + Repo scanner */}
+      <div style={{ display:'flex', gap:8, marginBottom:12, alignItems:'center', flexWrap:'wrap' }}>
+        <button className={tab === 'uploaded' ? 'btn-primary' : 'btn-secondary'} onClick={() => setTab('uploaded')} style={{ fontSize:12, padding:'6px 14px' }}>
+          Uploaded ({assets.length})
+        </button>
+        <button className={tab === 'repo' ? 'btn-primary' : 'btn-secondary'} onClick={() => setTab('repo')} style={{ fontSize:12, padding:'6px 14px' }}>
+          Repo images ({repoAssets.length})
+        </button>
+        {isGitHubConnected() && (
+          <div style={{ display:'flex', gap:6, marginLeft:'auto', alignItems:'center' }}>
+            <select className="input-field" value={selectedRepo} onChange={e => setSelectedRepo(e.target.value)} style={{ width:220, fontSize:12, padding:'5px 8px' }}>
+              <option value="">Select repo…</option>
+              {repos.map(r => <option key={r.id} value={r.full_name}>{r.full_name}</option>)}
+            </select>
+            <button className="btn-secondary" onClick={handleScanRepo} disabled={!selectedRepo || scanLoading} style={{ fontSize:12, padding:'5px 12px', whiteSpace:'nowrap' }}>
+              {scanLoading ? 'Scanning…' : 'Scan images'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -103,12 +185,14 @@ export default function AssetsTab({ project }) {
 
       {loading
         ? <div style={{ color:'var(--text3)', fontSize:13, padding:'40px 0', textAlign:'center' }}>Loading assets…</div>
-        : filtered.length === 0
+        : displayAssets.length === 0
         ? <div style={{ color:'var(--text3)', fontSize:13, padding:'40px 0', textAlign:'center' }}>
-            {assets.length === 0 ? 'No assets yet — upload your first image' : 'No assets match your search'}
+            {tab === 'repo'
+              ? (repoAssets.length === 0 ? 'Select a repo and click "Scan images" to find all images' : 'No images match your search')
+              : (assets.length === 0 ? 'No assets yet — upload your first image' : 'No assets match your search')}
           </div>
         : <div style={styles.grid}>
-            {filtered.map(asset => (
+            {displayAssets.map(asset => (
               <div key={asset.key} style={styles.card}>
                 <div style={styles.cardImg} onClick={() => setViewAsset(asset)}>
                   {asset.url
@@ -122,27 +206,30 @@ export default function AssetsTab({ project }) {
                 <div style={styles.cardBody}>
                   <div style={styles.cardName} title={asset.name}>{asset.name}</div>
                   <div style={styles.cardMeta}>
-                    {asset.format?.toUpperCase()} · {asset.width && asset.height ? `${asset.width}×${asset.height}` : '—'} · {formatBytes(asset.size || 0)}
+                    {asset.format?.toUpperCase()} · {asset.width && asset.height ? `${asset.width}×${asset.height}` : '—'} · {asset.size ? formatBytes(asset.size) : '—'}
                   </div>
+                  {asset.path && <div style={{ fontSize:10, color:'var(--text3)', fontFamily:'var(--mono)', marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={asset.path}>{asset.path}</div>}
                   <div style={styles.urlRow} title={asset.url}>
                     <span style={styles.urlText}>{asset.url}</span>
                   </div>
                   <div style={styles.cardActions}>
+                    <button style={{ ...styles.actionBtn, ...styles.actionBtnGhost }} onClick={() => setViewAsset(asset)}>
+                      View
+                    </button>
                     <button
                       style={{ ...styles.actionBtn, ...(copied===asset.key ? styles.actionBtnCopied : styles.actionBtnBlue) }}
                       onClick={() => copyUrl(asset)}
                     >
                       {copied === asset.key ? '✓ Copied' : 'Copy URL'}
                     </button>
-                    <button style={{ ...styles.actionBtn, ...styles.actionBtnAmber }} onClick={() => setReplaceAsset(asset)}>
-                      Replace
-                    </button>
-                    <button style={{ ...styles.actionBtn, ...styles.actionBtnGhost }} onClick={() => setViewAsset(asset)}>
-                      View
-                    </button>
-                    <button style={{ ...styles.actionBtn, ...styles.actionBtnDanger }} onClick={() => handleDelete(asset)}>
-                      ×
-                    </button>
+                    {asset.source !== 'repo' && <>
+                      <button style={{ ...styles.actionBtn, ...styles.actionBtnAmber }} onClick={() => setReplaceAsset(asset)}>
+                        Replace
+                      </button>
+                      <button style={{ ...styles.actionBtn, ...styles.actionBtnDanger }} onClick={() => handleDelete(asset)}>
+                        ×
+                      </button>
+                    </>}
                   </div>
                 </div>
               </div>

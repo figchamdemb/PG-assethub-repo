@@ -168,3 +168,19 @@ Summary:
 Anchors:
 - `src/lib/github.js` → `extractAllContent()` (new), `extractContentFromSource()` (kept for backward compat)
 - `src/pages/ContentTab.jsx` → `showSource`/`pageSources` state, `buildSectionsFromSource()` rewritten
+
+### [2026-03-31 21:20 UTC] - copilot
+Scope:
+- Components: frontend (github.js, ContentTab) — Content Editor import following + fresh extraction
+- Files touched: `src/lib/github.js`, `src/pages/ContentTab.jsx`
+
+Summary:
+- **Always extract fresh from source**: `handleLoadRepo` no longer loads stale content.json sections. Always calls `buildSectionsFromSource`. Keeps content.json SHA for push target. Fixes duplicate pages from old pushes.
+- **Follow component imports**: When a page has <3 text fields (common in Next.js), parses its `import` statements, resolves local imports against the repo tree, fetches those component files, and extracts text from them. Limited to 5 imports per page. Skips utility/hook/style imports.
+- **Next.js metadata extraction**: Extracts `title` and `description` from `export const metadata = { ... }` (Next.js 13+ App Router convention).
+- **Import resolution helpers**: New `parseImports()` and `resolveImport()` functions in github.js. Handles relative (`./`), alias (`@/`, `~/`), and `src/` prefixed paths.
+- Deployed to Cloudflare Pages. Pushed commit 51861ce.
+
+Anchors:
+- `src/lib/github.js` → `parseImports()`, `resolveImport()`, `extractAllContent()` (metadata extraction)
+- `src/pages/ContentTab.jsx` → `handleLoadRepo()` (fresh extraction), `buildSectionsFromSource()` (import following)
