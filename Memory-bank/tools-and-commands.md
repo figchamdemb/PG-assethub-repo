@@ -44,6 +44,14 @@ Update this whenever runtime, dependencies, or service startup commands change.
   - `wrangler whoami`
 - Login to Cloudflare:
   - `wrangler login`
+- Set Stripe secrets:
+  - `cd worker && wrangler secret put STRIPE_SECRET_KEY`
+  - `cd worker && wrangler secret put STRIPE_WEBHOOK_SECRET`
+  - `cd worker && wrangler secret put ADMIN_SECRET`
+- Setup Stripe products (one-time, after deploying worker):
+  - `curl -X POST https://assethub-worker.ebrimchamdemba.workers.dev/stripe/setup -H "X-Admin-Key: YOUR_ADMIN_SECRET"`
+- Create admin coupon:
+  - `curl -X POST https://assethub-worker.ebrimchamdemba.workers.dev/admin/coupons -H "X-Admin-Key: YOUR_ADMIN_SECRET" -H "Content-Type: application/json" -d '{"code":"TEAM2026","plan":"admin","maxUses":-1}'`
 
 ### Cloudflare Pages
 - Create Pages project:

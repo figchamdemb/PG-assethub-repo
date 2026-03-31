@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   isGitHubConnected, getGitHubToken, setGitHubToken, clearGitHubToken,
   getGitHubUser, listRepos, getRepoTree, detectPages,
-  loadContentJson, saveContentJson,
+  loadContentJson, saveContentJson, getRepoFile, extractContentFromSource,
   startGitHubOAuth, handleOAuthCallback
 } from '../lib/github.js'
 import { listAssets } from '../lib/storage.js'
@@ -70,7 +70,13 @@ export default function ContentTab({ project }) {
       setPages(detected)
       if (detected.length) setActivePage(detected[0])
       const { sections: s, sha } = await loadContentJson(selectedRepo, selectedBranch)
-      setSections(s.length ? s : buildDefaultSections(detected))
+      if (s.length) {
+        setSections(s)
+      } else {
+        // No content.json yet — extract content from actual source files
+        const extracted = await buildSectionsFromSource(detected, selectedRepo, selectedBranch)
+        setSections(extracted)
+      }
       setContentSha(sha)
       setDirty(false)
     } catch (e) {
@@ -79,18 +85,27 @@ export default function ContentTab({ project }) {
     setLoading(false)
   }
 
-  function buildDefaultSections(pages) {
-    return pages.map(p => ({
-      page: p.name,
-      pageLabel: p.label,
-      fields: [
-        { key: 'title', label: 'Page title', type: 'text', value: p.label },
-        { key: 'hero_heading', label: 'Hero heading', type: 'text', value: '' },
-        { key: 'hero_subheading', label: 'Hero subheading', type: 'textarea', value: '' },
-        { key: 'hero_image', label: 'Hero image', type: 'image', value: '', width: 1920, height: 600 },
-        { key: 'body_text', label: 'Body text', type: 'textarea', value: '' },
-      ]
+  async function buildSectionsFromSource(pages, repo, branch) {
+    // Fetch all page files in parallel for speed
+    const results = await Promise.all(pages.map(async (p) => {
+      let ex = { title: '', heading: '', subheading: '', bodyText: '', heroImage: '' }
+      try {
+        const file = await getRepoFile(repo, p.path, branch)
+        if (file) ex = extractContentFromSource(file.content, p.path)
+      } catch { /* ignore fetch errors */ }
+      return {
+        page: p.name,
+        pageLabel: p.label,
+        fields: [
+          { key: 'title', label: 'Page title', type: 'text', value: ex.title || p.label },
+          { key: 'hero_heading', label: 'Hero heading', type: 'text', value: ex.heading },
+          { key: 'hero_subheading', label: 'Hero subheading', type: 'textarea', value: ex.subheading },
+          { key: 'hero_image', label: 'Hero image', type: 'image', value: ex.heroImage, width: 1920, height: 600 },
+          { key: 'body_text', label: 'Body text', type: 'textarea', value: ex.bodyText },
+        ]
+      }
     }))
+    return results
   }
 
   function updateField(page, key, value) {

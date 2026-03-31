@@ -72,3 +72,41 @@ Anchors:
 - `worker/index.js` → `purpose` param in OAuth flow
 - `src/lib/auth.jsx` → `loginWithGitHub()`, GitHub callback in useEffect
 - `src/pages/Login.jsx` → GitHub login button
+
+### [2026-03-31 15:55 UTC] - copilot
+Scope:
+- Components: worker, frontend (plans, pricing, auth, storage, dashboard)
+- Files touched: `worker/index.js`, `worker/wrangler.toml`, `src/lib/plans.js` (new), `src/lib/auth.jsx`, `src/lib/storage.js`, `src/pages/PricingPage.jsx` (new), `src/pages/Dashboard.jsx`, `src/config.js`
+
+Summary:
+- Implemented full monetization system: Freemium SaaS with Free/Pro ($9/mo)/Agency ($29/mo) tiers.
+- Worker: Added plan storage in R2 (`_meta/users/{id}.json`), plan enforcement on upload (storage limit) and project creation (project limit), content push tracking with monthly reset.
+- Stripe integration: checkout session creation, webhook handler (signature verification via HMAC-SHA256), customer billing portal, one-time product/price setup endpoint (`POST /stripe/setup`).
+- Admin system: `POST /admin/set-role` to grant admin/agency plan to staff, `POST /admin/coupons` to create coupon codes, `POST /admin/redeem` public endpoint for coupon redemption.
+- Frontend: Pricing page with tier cards, usage dashboard, Stripe checkout redirect, coupon code entry. Plan badge in Dashboard topbar.
+- Auth: `getUserId()` utility for consistent user identification (`github_login` or `email_...`). Plan state loaded on login and exposed via `useAuth()`.
+- Storage lib: All Worker API calls now send `X-User-Id` header for plan enforcement.
+- Worker secrets needed: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `ADMIN_SECRET`.
+
+Anchors:
+- `worker/index.js` → `/user/plan`, `/stripe/checkout`, `/stripe/webhook`, `/stripe/setup`, `/stripe/portal`, `/admin/set-role`, `/admin/redeem`, `/admin/coupons`
+- `src/lib/plans.js` → plan tier definitions
+- `src/pages/PricingPage.jsx` → pricing UI
+- `src/lib/auth.jsx` → `getUserId()`, `userPlan` state
+- `src/lib/storage.js` → `createCheckoutSession()`, `openBillingPortal()`, `redeemCoupon()`, `reportContentPush()`
+
+### [2026-03-31 16:30 UTC] - copilot
+Scope:
+- Components: frontend (github.js, ContentTab)
+- Files touched: `src/lib/github.js`, `src/pages/ContentTab.jsx`
+
+Summary:
+- Fixed Content Editor bug: pages loaded from GitHub but all content fields were empty.
+- Root cause: When no `content.json` existed in the repo, `buildDefaultSections()` created fields with empty values. The editor never read actual content from source files.
+- Fix: Added `extractContentFromSource()` to `github.js` — parses HTML/JSX files to extract `<title>`, `<h1>`, `<h2>`, `<p>`, and `<img>` content using regex.
+- `handleLoadRepo()` now calls `buildSectionsFromSource()` (fetches each page file via GitHub API and pre-populates fields) when no `content.json` is found.
+- Improved `detectPages()` — now skips non-page files (main, config, provider, context, etc.) and utility directories (lib, hooks, helpers, components, services, etc.). Prioritises files in `pages/`, `app/`, `views/`, `routes/` directories. Root-level HTML files always included.
+
+Anchors:
+- `src/lib/github.js` → `extractContentFromSource()`, improved `detectPages()`
+- `src/pages/ContentTab.jsx` → `buildSectionsFromSource()`, `getRepoFile` + `extractContentFromSource` import

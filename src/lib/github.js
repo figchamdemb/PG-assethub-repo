@@ -114,12 +114,28 @@ export async function putRepoFile(repo, path, content, message, sha, branch = 'm
 
 // Detect pages from repo tree
 export function detectPages(tree) {
-  const pageFiles = tree.filter(f =>
-    f.type === 'blob' &&
-    (f.path.match(/\.(html|jsx|tsx|vue|astro|svelte)$/) ||
-     f.path.match(/pages\//i) ||
-     f.path.match(/app\//i))
-  )
+  const pageExt = /\.(html|jsx|tsx|vue|astro|svelte)$/
+  // Non-page filenames and directories to skip
+  const SKIP_NAMES = /^(layout|_layout|_app|_document|app|main|entry|setup|provider|context|store|router|routes|utils|helpers|types|constants|config|middleware|error|loading|not-found)$/i
+  const SKIP_DIRS = /\b(lib|utils|hooks|helpers|components|services|store|context|styles|assets|public|node_modules|__tests__|test)\b/i
+
+  const pageFiles = tree.filter(f => {
+    if (f.type !== 'blob') return false
+    if (!pageExt.test(f.path)) return false
+    const parts = f.path.split('/')
+    const filename = parts[parts.length - 1]
+    const name = filename.replace(pageExt, '')
+    // Always skip known non-page names
+    if (SKIP_NAMES.test(name)) return false
+    // Files in pages/ or app/ dirs are always included
+    const inPageDir = /\b(pages?|app|views?|routes?)\b/i.test(f.path.replace(filename, ''))
+    if (inPageDir) return true
+    // Root-level HTML files are pages
+    if (parts.length === 1 && /\.html$/.test(filename)) return true
+    // Otherwise skip files inside utility directories
+    if (SKIP_DIRS.test(f.path)) return false
+    return true
+  })
 
   const pages = []
   const seen = new Set()
@@ -127,16 +143,13 @@ export function detectPages(tree) {
   for (const f of pageFiles) {
     const parts = f.path.split('/')
     const filename = parts[parts.length - 1]
-    const name = filename.replace(/\.(html|jsx|tsx|vue|astro|svelte)$/, '')
+    const name = filename.replace(pageExt, '')
 
-    // Normalise page name
     let label = name
       .replace(/[-_]/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
       .replace(/^Index$/, 'Home')
-      .replace(/^Page$/, 'Page')
 
-    if (label === 'Layout' || label === 'App' || label === '_App' || label === '_Document') continue
     if (seen.has(f.path)) continue
     seen.add(f.path)
 
@@ -144,6 +157,74 @@ export function detectPages(tree) {
   }
 
   return pages.slice(0, 20)
+}
+
+// Extract text content from an HTML/JSX source file
+export function extractContentFromSource(content, filePath) {
+  const ext = (filePath.split('.').pop() || '').toLowerCase()
+  const result = { title: '', heading: '', subheading: '', bodyText: '', heroImage: '' }
+
+  // Collapse whitespace and strip JSX noise from extracted text
+  const norm = (s) => s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
+  // Reject strings that look like JS variable references rather than real content
+  const isReal = (s) => s && !/^[a-z_$][a-z0-9_.|\s]*$/i.test(s) && s.length > 1
+  const isRealUrl = (s) => s && /^https?:\/\//.test(s)
+
+  // Strip script/style blocks to avoid false matches
+  const clean = content
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+
+  // HTML-like files
+  if (['html', 'astro', 'svelte', 'vue'].includes(ext)) {
+    const titleMatch = content.match(/<title[^>]*>(.*?)<\/title>/is)
+    if (titleMatch) result.title = norm(titleMatch[1])
+
+    const h1 = clean.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+    if (h1) result.heading = norm(h1[1])
+
+    const h2 = clean.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
+    if (h2) result.subheading = norm(h2[1])
+
+    const pAll = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    for (const m of pAll) {
+      const txt = norm(m[1])
+      if (txt.length > 15 && isReal(txt)) { result.bodyText = txt; break }
+    }
+
+    const imgAll = [...clean.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)]
+    for (const m of imgAll) {
+      if (isRealUrl(m[1])) { result.heroImage = m[1]; break }
+    }
+  }
+
+  // JSX / TSX files
+  if (['jsx', 'tsx'].includes(ext)) {
+    const h1 = clean.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+    if (h1) {
+      const inner = norm(h1[1])
+      if (isReal(inner)) result.heading = inner
+    }
+
+    const h2 = clean.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
+    if (h2) {
+      const inner = norm(h2[1])
+      if (isReal(inner)) result.subheading = inner
+    }
+
+    const pAll = [...clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    for (const m of pAll) {
+      const txt = norm(m[1])
+      if (txt.length > 15 && isReal(txt)) { result.bodyText = txt; break }
+    }
+
+    const imgAll = [...clean.matchAll(/<img[^>]+src=["'{]([^"'}]+)["'}][^>]*\/?>/gi)]
+    for (const m of imgAll) {
+      if (isRealUrl(m[1])) { result.heroImage = m[1]; break }
+    }
+  }
+
+  return result
 }
 
 // Read content.json from a project's repo and parse sections

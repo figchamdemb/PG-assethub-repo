@@ -1,12 +1,30 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import config from '../config.js'
 import { setGitHubToken } from './github.js'
 
 const AuthContext = createContext(null)
 
+export function getUserId(user) {
+  if (!user) return null
+  if (user.provider === 'github' && user.login) return `github_${user.login}`
+  return `email_${(user.email || 'unknown').replace(/[^a-zA-Z0-9@._-]/g, '_')}`
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [userPlan, setUserPlan] = useState(null)
+
+  const loadPlan = useCallback(async (u) => {
+    if (!u) return
+    const uid = getUserId(u)
+    try {
+      const res = await fetch(`${config.workerUrl}/user/plan`, {
+        headers: { 'X-User-Id': uid },
+      })
+      if (res.ok) setUserPlan(await res.json())
+    } catch {}
+  }, [])
 
   useEffect(() => {
     // Check for GitHub OAuth login callback
@@ -21,6 +39,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem('assethub_user', JSON.stringify(ghUser))
         // Also store the GitHub token so Content Editor is pre-connected
         setGitHubToken(ghToken)
+        loadPlan(ghUser)
       } catch {}
       // Clean the URL
       window.history.replaceState({}, '', window.location.pathname)
@@ -31,10 +50,14 @@ export function AuthProvider({ children }) {
     // Check if we have a stored session
     const stored = localStorage.getItem('assethub_user')
     if (stored) {
-      try { setUser(JSON.parse(stored)) } catch {}
+      try {
+        const u = JSON.parse(stored)
+        setUser(u)
+        loadPlan(u)
+      } catch {}
     }
     setLoading(false)
-  }, [])
+  }, [loadPlan])
 
   // Login with Google via Cloudflare Access
   // When deployed on Cloudflare Pages with Access enabled,
@@ -68,12 +91,15 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null)
+    setUserPlan(null)
     localStorage.removeItem('assethub_user')
     localStorage.removeItem('assethub_github_token')
   }
 
+  const refreshPlan = () => loadPlan(user)
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithGitHub, loginDemo, logout }}>
+    <AuthContext.Provider value={{ user, loading, userPlan, refreshPlan, loginWithGoogle, loginWithGitHub, loginDemo, logout }}>
       {children}
     </AuthContext.Provider>
   )

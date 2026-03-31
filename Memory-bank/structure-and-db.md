@@ -25,15 +25,17 @@ assethub/
 │   ├── index.css            ← Global styles
 │   ├── config.js            ← Asset types, size presets
 │   ├── lib/
-│   │   ├── auth.jsx         ← Google/demo login
-│   │   ├── storage.js       ← R2 uploads, image compression
-│   │   └── github.js        ← GitHub API, content sync
+│   │   ├── auth.jsx         ← Google/GitHub login + plan state
+│   │   ├── storage.js       ← R2 uploads, image compression, Stripe helpers
+│   │   ├── github.js        ← GitHub API, content sync
+│   │   └── plans.js         ← Plan tier definitions (shared constants)
 │   └── pages/
 │       ├── Login.jsx        ← Login screen
-│       ├── Dashboard.jsx    ← Shell, sidebar, project list
+│       ├── Dashboard.jsx    ← Shell, sidebar, project list, plan badge
 │       ├── UploadTab.jsx    ← Upload + compress + download
 │       ├── AssetsTab.jsx    ← Browse, copy URL, replace, delete
-│       └── ContentTab.jsx   ← GitHub sync, text + image editor
+│       ├── ContentTab.jsx   ← GitHub sync, text + image editor
+│       └── PricingPage.jsx  ← Pricing tiers, Stripe checkout, coupon entry
 ├── worker/
 │   ├── index.js             ← Cloudflare Worker (R2 handler)
 │   └── wrangler.toml        ← Worker config (bucket binding, R2 URL)
@@ -53,6 +55,9 @@ assethub/
 | `_meta/{project}/assets.json` | Worker | R2 | Array of asset metadata per project |
 | `{project}/{name}.{format}` | Worker | R2 | Actual image files |
 | `content.json` | ContentTab | GitHub repo | Website content data |
+| `_meta/users/{user_id}.json` | Worker | R2 | User plan, usage, Stripe customer ID |
+| `_meta/config/stripe.json` | Worker | R2 | Stripe product/price IDs |
+| `_meta/config/coupons.json` | Worker | R2 | Coupon codes for admin/free plans |
 
 ## Deployment URLs
 | Service | URL |

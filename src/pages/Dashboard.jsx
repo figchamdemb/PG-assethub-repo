@@ -4,15 +4,17 @@ import { listProjects, createProject, deleteProject } from '../lib/storage.js'
 import UploadTab from './UploadTab.jsx'
 import AssetsTab from './AssetsTab.jsx'
 import ContentTab from './ContentTab.jsx'
+import PricingPage from './PricingPage.jsx'
 
 const NAV = [
   { id: 'upload', label: 'Upload', icon: UploadIcon },
   { id: 'assets', label: 'Browse assets', icon: GridIcon },
   { id: 'content', label: 'Content editor', icon: EditIcon },
+  { id: 'pricing', label: 'Pricing', icon: CreditCardIcon },
 ]
 
 export default function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, logout, userPlan } = useAuth()
   const [tab, setTab] = useState('upload')
   const [projects, setProjects] = useState([])
   const [activeProject, setActiveProject] = useState(null)
@@ -45,11 +47,15 @@ export default function Dashboard() {
   async function handleCreateProject(e) {
     e.preventDefault()
     if (!newProjectName.trim()) return
-    const proj = await createProject(newProjectName.trim())
-    setProjects(p => [...p, proj])
-    setActiveProject(proj)
-    setNewProjectName('')
-    setShowNewProject(false)
+    try {
+      const proj = await createProject(newProjectName.trim())
+      setProjects(p => [...p, proj])
+      setActiveProject(proj)
+      setNewProjectName('')
+      setShowNewProject(false)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   async function handleDeleteProject(proj) {
@@ -79,8 +85,12 @@ export default function Dashboard() {
             </button>
           ))}
         </nav>
-        <div style={styles.topRight}>
-          <div style={styles.avatar} title={user?.email}>{initials}</div>
+        <div style={styles.topRight}>            {userPlan && (
+              <span className={`chip chip-${userPlan.plan === 'admin' ? 'purple' : userPlan.plan === 'agency' ? 'green' : userPlan.plan === 'pro' ? 'blue' : 'amber'}`}
+                style={{ cursor: 'pointer' }} onClick={() => setTab('pricing')}>
+                {(userPlan.plan || 'free').toUpperCase()}
+              </span>
+            )}          <div style={styles.avatar} title={user?.email}>{initials}</div>
           <span style={{ fontSize:12, color:'var(--text2)' }}>{user?.email}</span>
           <button className="btn-ghost" onClick={logout} style={{ fontSize:12, padding:'5px 10px' }}>Sign out</button>
         </div>
@@ -140,8 +150,10 @@ export default function Dashboard() {
 
         {/* Main content */}
         <main style={styles.main}>
-          {!activeProject
+          {!activeProject && tab !== 'pricing'
             ? <EmptyState onNew={() => setShowNewProject(true)} />
+            : tab === 'pricing'
+            ? <PricingPage />
             : tab === 'upload'
             ? <UploadTab project={activeProject} />
             : tab === 'assets'
@@ -238,4 +250,7 @@ function FolderIcon({ size = 16 }) {
 }
 function PlusIcon({ size = 16 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+}
+function CreditCardIcon({ size = 16 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
 }

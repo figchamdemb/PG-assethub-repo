@@ -12,6 +12,9 @@ const config = {
   // GitHub OAuth App credentials (create at github.com/settings/developers)
   githubClientId: import.meta.env.VITE_GITHUB_CLIENT_ID || '',
 
+  // Stripe publishable key (get from Stripe Dashboard → Developers → API keys)
+  stripePublishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
+
   // App name shown in UI
   appName: 'AssetHub',
 
