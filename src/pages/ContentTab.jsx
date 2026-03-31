@@ -3,6 +3,7 @@ import {
   isGitHubConnected, getGitHubToken, setGitHubToken, clearGitHubToken,
   getGitHubUser, listRepos, getRepoTree, detectPages,
   loadContentJson, saveContentJson, getRepoFile, extractAllContent,
+  parseImports, resolveImport,
   startGitHubOAuth, handleOAuthCallback
 } from '../lib/github.js'
 import { listAssets } from '../lib/storage.js'
@@ -71,14 +72,10 @@ export default function ContentTab({ project }) {
       const detected = detectPages(tree)
       setPages(detected)
       if (detected.length) setActivePage(detected[0])
-      const { sections: s, sha } = await loadContentJson(selectedRepo, selectedBranch)
-      if (s.length) {
-        setSections(s)
-      } else {
-        // No content.json yet — extract content from actual source files
-        const extracted = await buildSectionsFromSource(detected, selectedRepo, selectedBranch)
-        setSections(extracted)
-      }
+      // Always extract fresh from source (content.json SHA kept for push)
+      const { sha } = await loadContentJson(selectedRepo, selectedBranch)
+      const extracted = await buildSectionsFromSource(detected, selectedRepo, selectedBranch, tree)
+      setSections(extracted)
       setContentSha(sha)
       setDirty(false)
     } catch (e) {
@@ -87,8 +84,9 @@ export default function ContentTab({ project }) {
     setLoading(false)
   }
 
-  async function buildSectionsFromSource(pages, repo, branch) {
+  async function buildSectionsFromSource(pages, repo, branch, tree) {
     const sources = {}
+    const SKIP_IMP = /\b(hook|util|lib|style|css|context|store|type|interface|model|api|service|config|constant)\b/i
     const results = await Promise.all(pages.map(async (p) => {
       let fields = []
       try {
@@ -96,6 +94,26 @@ export default function ContentTab({ project }) {
         if (file) {
           sources[p.name] = file.content
           fields = extractAllContent(file.content, p.path)
+
+          // If page has very few text fields, follow imports to find component content
+          const textCount = fields.filter(f => f.type !== 'image').length
+          if (textCount < 3 && tree) {
+            const imports = parseImports(file.content).filter(i => !SKIP_IMP.test(i)).slice(0, 5)
+            for (const imp of imports) {
+              const resolved = resolveImport(imp, tree)
+              if (!resolved) continue
+              try {
+                const compFile = await getRepoFile(repo, resolved, branch)
+                if (compFile) {
+                  const compFields = extractAllContent(compFile.content, resolved)
+                  if (compFields.length > 0) {
+                    sources[p.name] += `\n\n// \u2500\u2500 ${resolved} \u2500\u2500\n${compFile.content}`
+                    fields = [...fields, ...compFields]
+                  }
+                }
+              } catch { /* skip */ }
+            }
+          }
         }
       } catch { /* ignore fetch errors */ }
       if (fields.length === 0) fields = [{ key: 'title', label: 'Page title', type: 'text', value: p.label }]

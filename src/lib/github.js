@@ -321,6 +321,15 @@ export function extractAllContent(content, filePath) {
   const titleM = content.match(/<title[^>]*>(.*?)<\/title>/is)
   if (titleM) add('title', titleM[1])
 
+  // Next.js metadata export: export const metadata = { title: '...', description: '...' }
+  const metaBlock = content.match(/export\s+const\s+metadata\s*=\s*\{([\s\S]*?)\}/)
+  if (metaBlock) {
+    const mt = metaBlock[1].match(/title\s*:\s*["'`]([^"'`]+)["'`]/)
+    if (mt) add('title', mt[1])
+    const md = metaBlock[1].match(/description\s*:\s*["'`]([^"'`]+)["'`]/)
+    if (md) add('p', md[1])
+  }
+
   // All headings
   for (const tag of ['h1','h2','h3','h4','h5','h6'])
     for (const m of clean.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')))
@@ -364,6 +373,37 @@ export function extractAllContent(content, filePath) {
     if (/\.(png|jpg|jpeg|gif|svg|webp)/i.test(m[1])) addImg(m[1], 'background')
 
   return fields
+}
+
+// Parse local imports from a source file
+export function parseImports(content) {
+  const imports = []
+  for (const m of content.matchAll(/import\s+(?:\{[^}]*\}|\w+)\s+from\s+['"]([^'"]+)['"]/g)) {
+    const p = m[1]
+    if (p.startsWith('.') || p.startsWith('@/') || p.startsWith('~/')) imports.push(p)
+  }
+  return imports
+}
+
+// Resolve an import path against the repo tree
+export function resolveImport(importPath, tree) {
+  const clean = importPath.replace(/^[@~]\//, '').replace(/^\.\/?/, '')
+  const exts = ['.tsx', '.jsx', '.ts', '.js']
+  for (const f of tree) {
+    if (f.type !== 'blob') continue
+    for (const ext of exts) {
+      if (f.path === clean + ext || f.path.endsWith('/' + clean + ext)) return f.path
+      if (f.path === clean + '/index' + ext || f.path.endsWith('/' + clean + '/index' + ext)) return f.path
+    }
+  }
+  // Try with src/ prefix
+  for (const f of tree) {
+    if (f.type !== 'blob') continue
+    for (const ext of exts) {
+      if (f.path === 'src/' + clean + ext) return f.path
+    }
+  }
+  return null
 }
 
 // Read content.json from a project's repo and parse sections

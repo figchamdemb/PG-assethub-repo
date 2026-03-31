@@ -152,3 +152,19 @@ Summary:
 
 Anchors:
 - `src/lib/github.js` → `isReal()` (fixed), `detectPages()` (label dedup), `extractContentFromSource()` (fallback extraction)
+
+### [2026-03-31 20:30 UTC] - copilot
+Scope:
+- Components: frontend (github.js, ContentTab) — Content Editor redesign
+- Files touched: `src/lib/github.js`, `src/pages/ContentTab.jsx`
+
+Summary:
+- **Redesigned content extraction**: New `extractAllContent()` function replaces fixed 5-field extraction. Extracts ALL headings (h1-h6), ALL paragraphs, ALL spans/links/buttons/list items, ALL images (<img>, <Image>, CSS url()), with fallback to named string constants and long quoted strings.
+- **Source code viewer**: Added toggle button "</> Source" in field panel header. Shows raw page source in scrollable monospace panel. Users can see exactly what's in the file.
+- **Dynamic fields**: Instead of hardcoded title/heading/subheading/image/body, each page now gets as many fields as there are text elements + images found. All rendered with existing FieldEditor.
+- **Page sources stored**: Raw source code stored per page in `pageSources` state for source viewer display.
+- Deployed to Cloudflare Pages. Pushed commit 96fe607.
+
+Anchors:
+- `src/lib/github.js` → `extractAllContent()` (new), `extractContentFromSource()` (kept for backward compat)
+- `src/pages/ContentTab.jsx` → `showSource`/`pageSources` state, `buildSectionsFromSource()` rewritten
