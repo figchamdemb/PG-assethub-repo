@@ -1,0 +1,120 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0f11;
+  --bg2: #161719;
+  --bg3: #1e2023;
+  --bg4: #26282c;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0f0ee;
+  --text2: #9a9a96;
+  --text3: #5a5a56;
+  --accent: #4f7fff;
+  --accent-dim: rgba(79,127,255,0.15);
+  --accent-hover: #6b93ff;
+  --green: #3ecf8e;
+  --green-dim: rgba(62,207,142,0.12);
+  --amber: #f5a623;
+  --amber-dim: rgba(245,166,35,0.12);
+  --red: #ff5757;
+  --red-dim: rgba(255,87,87,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --r: 8px;
+  --r2: 12px;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: var(--font); cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: var(--font); outline: none; }
+a { color: inherit; text-decoration: none; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--r); font-size: 13px; font-weight: 500;
+  background: var(--accent); color: #fff; transition: background .15s, transform .1s;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--r); font-size: 13px; font-weight: 500;
+  background: var(--bg3); color: var(--text2); border: 1px solid var(--border2);
+  transition: background .15s, color .15s;
+}
+.btn-secondary:hover { background: var(--bg4); color: var(--text); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--r); font-size: 13px;
+  color: var(--text2); transition: background .15s, color .15s;
+}
+.btn-ghost:hover { background: var(--bg3); color: var(--text); }
+
+.btn-green {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--r); font-size: 13px; font-weight: 500;
+  background: var(--green-dim); color: var(--green); border: 1px solid rgba(62,207,142,0.25);
+  transition: background .15s;
+}
+.btn-green:hover { background: rgba(62,207,142,0.2); }
+
+.btn-danger {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border-radius: var(--r); font-size: 12px;
+  background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,87,87,0.2);
+  transition: background .15s;
+}
+.btn-danger:hover { background: rgba(255,87,87,0.2); }
+
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 500;
+}
+.chip-blue { background: var(--accent-dim); color: var(--accent); }
+.chip-green { background: var(--green-dim); color: var(--green); }
+.chip-amber { background: var(--amber-dim); color: var(--amber); }
+.chip-purple { background: var(--purple-dim); color: var(--purple); }
+.chip-red { background: var(--red-dim); color: var(--red); }
+
+.card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r2);
+  padding: 20px;
+}
+
+.input-field {
+  width: 100%; padding: 9px 12px; border-radius: var(--r);
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text); font-size: 13px; transition: border-color .15s;
+}
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--text3); }
+
+select.input-field option { background: var(--bg3); }
+
+.label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; display: block; }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn .2s ease; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

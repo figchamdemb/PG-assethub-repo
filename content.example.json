@@ -1,0 +1,89 @@
+{
+  "sections": [
+    {
+      "page": "index",
+      "pageLabel": "Home",
+      "fields": [
+        {
+          "key": "hero_heading",
+          "label": "Hero heading",
+          "type": "text",
+          "value": "Great coffee, every single morning."
+        },
+        {
+          "key": "hero_subheading",
+          "label": "Hero subheading",
+          "type": "textarea",
+          "value": "Handcrafted espresso drinks made with locally sourced beans. Visit us on the high street."
+        },
+        {
+          "key": "hero_image",
+          "label": "Hero image",
+          "type": "image",
+          "value": "https://pub-REPLACE.r2.dev/barista-cafe/hero-homepage.webp",
+          "width": 1920,
+          "height": 600
+        },
+        {
+          "key": "hero_cta",
+          "label": "CTA button text",
+          "type": "text",
+          "value": "Order now"
+        }
+      ]
+    },
+    {
+      "page": "about",
+      "pageLabel": "About",
+      "fields": [
+        {
+          "key": "title",
+          "label": "Page title",
+          "type": "text",
+          "value": "Our story"
+        },
+        {
+          "key": "body",
+          "label": "Body text",
+          "type": "textarea",
+          "value": "Founded in 2018, Barista started as a small cart outside Dagenham Market. Today we serve over 300 customers a day across two locations."
+        },
+        {
+          "key": "team_photo",
+          "label": "Team photo",
+          "type": "image",
+          "value": "https://pub-REPLACE.r2.dev/barista-cafe/team-photo.webp",
+          "width": 1200,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "page": "menu",
+      "pageLabel": "Menu",
+      "fields": [
+        {
+          "key": "title",
+          "label": "Menu page title",
+          "type": "text",
+          "value": "Our menu"
+        },
+        {
+          "key": "intro",
+          "label": "Intro text",
+          "type": "textarea",
+          "value": "Everything made fresh to order."
+        },
+        {
+          "key": "menu_banner",
+          "label": "Menu banner image",
+          "type": "image",
+          "value": "https://pub-REPLACE.r2.dev/barista-cafe/menu-banner.webp",
+          "width": 1200,
+          "height": 400
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}

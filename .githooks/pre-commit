@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="C:/Users/ebrim/Desktop"
+python "/assethub/scripts/memory_bank_guard.py"
