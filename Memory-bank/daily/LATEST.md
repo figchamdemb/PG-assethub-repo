@@ -2,4 +2,4 @@
 
 Latest: 2026-03-31
 File: Memory-bank/daily/2026-03-31.md
-Last change: Fixed Next.js App Router page labels (page.jsx → label from parent dir), added hasCode() to strip JS code from body text extraction. Also fixed GitHub Login redirect and detectPages component filtering. Deployed commit ed3a7f1.
+Last change: Fixed duplicate pages (dedup by label not path), fixed isReal() rejecting English text, added fallback string literal extraction for JSX content where tag extraction yielded empty fields. Deployed commit 41f5c2d.

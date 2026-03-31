@@ -288,6 +288,84 @@ export function extractContentFromSource(content, filePath) {
   return result
 }
 
+// Extract ALL text and images from a source file — returns dynamic field array
+export function extractAllContent(content, filePath) {
+  const ext = (filePath.split('.').pop() || '').toLowerCase()
+  const fields = []
+  const norm = (s) => s.replace(/<[^>]+>/g, '').replace(/\{[^}]*\}/g, '').replace(/\s+/g, ' ').trim()
+  const hasCode = (s) => /\b(const |let |var |function |=>|import |require\(|\.map\(|\.filter\(|\.forEach\()/.test(s)
+
+  let clean = content
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+  if (['jsx', 'tsx'].includes(ext)) {
+    clean = clean
+      .replace(/^import\s+.*$/gm, '')
+      .replace(/\{(?:\/\*[\s\S]*?\*\/|[^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g, ' ')
+      .replace(/\/\/[^\n]*/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+  }
+
+  const seen = new Set()
+  let idx = 0
+  const labels = { title:'Title', h1:'Heading', h2:'Subheading', h3:'Heading 3', h4:'Heading 4', p:'Paragraph', span:'Text', a:'Link text', li:'List item', button:'Button text', label:'Label', figcaption:'Caption', blockquote:'Quote', string:'Text' }
+  const add = (tag, raw) => {
+    const text = norm(raw)
+    if (text.length < 2 || seen.has(text) || hasCode(text)) return
+    seen.add(text)
+    const type = (tag === 'p' || tag === 'blockquote' || text.length > 80) ? 'textarea' : 'text'
+    fields.push({ key: `${tag}_${idx++}`, label: labels[tag] || 'Text', type, value: text })
+  }
+
+  // Title tag
+  const titleM = content.match(/<title[^>]*>(.*?)<\/title>/is)
+  if (titleM) add('title', titleM[1])
+
+  // All headings
+  for (const tag of ['h1','h2','h3','h4','h5','h6'])
+    for (const m of clean.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')))
+      add(tag, m[1])
+
+  // All paragraphs
+  for (const m of clean.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi))
+    add('p', m[1])
+
+  // Spans, links, list items, buttons
+  for (const tag of ['span','a','li','label','button','figcaption','blockquote'])
+    for (const m of clean.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')))
+      if (norm(m[1]).length > 3) add(tag, m[1])
+
+  // Fallback: named string constants
+  if (fields.filter(f => f.type !== 'image').length < 3) {
+    for (const m of content.matchAll(/(?:title|heading|description|subtitle|body|text|label|caption|hero|cta)\w*\s*[:=]\s*["'`]([^"'`\n]{3,})["'`]/gi))
+      add('string', m[1])
+  }
+  // Fallback: any long quoted strings
+  if (fields.filter(f => f.type !== 'image').length < 3) {
+    for (const m of content.matchAll(/["'`]([^"'`\n]{20,})["'`]/g)) {
+      const s = m[1].trim()
+      if (/\s/.test(s) && !hasCode(s) && !/^[@\/.\\#{}(]/.test(s)) add('string', s)
+    }
+  }
+
+  // ALL images: <img>, <Image>, CSS url()
+  const imgSeen = new Set()
+  let imgIdx = 0
+  const addImg = (src, alt) => {
+    if (imgSeen.has(src) || !src) return
+    imgSeen.add(src)
+    fields.push({ key: `img_${imgIdx++}`, label: alt ? `Image: ${alt}` : 'Image', type: 'image', value: src })
+  }
+  for (const m of content.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi))
+    addImg(m[1], (m[0].match(/alt=["']([^"']*)["']/i) || [])[1] || '')
+  for (const m of content.matchAll(/<Image[^>]+src=["'{]([^"'}]+)["'}][^>]*>/gi))
+    addImg(m[1], '')
+  for (const m of content.matchAll(/url\(["']?([^"')]+)["']?\)/gi))
+    if (/\.(png|jpg|jpeg|gif|svg|webp)/i.test(m[1])) addImg(m[1], 'background')
+
+  return fields
+}
+
 // Read content.json from a project's repo and parse sections
 export async function loadContentJson(repo, branch) {
   const file = await getRepoFile(repo, 'content.json', branch)

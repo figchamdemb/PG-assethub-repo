@@ -138,3 +138,17 @@ Summary:
 
 Anchors:
 - `src/lib/github.js` → `detectPages()` (SKIP_NAMES, SKIP_COMPONENT, SKIP_APP_NAMES, SKIP_DIRS, Next.js App Router label logic), `extractContentFromSource()` (hasCode(), enhanced clean pipeline)
+
+### [2026-03-31 19:55 UTC] - copilot
+Scope:
+- Components: frontend (github.js) — Content Editor duplicate pages + empty content
+- Files touched: `src/lib/github.js`
+
+Summary:
+- Fixed **duplicate pages**: Changed dedup in `detectPages()` from path-based to label-based (case-insensitive). Two files at different paths with the same label (e.g. `app/help/page.jsx` + `src/pages/help.jsx`) now only appear once.
+- Fixed **isReal() rejecting all English text**: The old regex `/^[a-z_$][a-z0-9_.|\s]*$/i` with case-insensitive flag matched virtually all English words and phrases. New logic: multi-word strings → always real, single lowercase tokens → reject as variables, single Capitalized words → accept as real content.
+- Added **fallback string literal extraction**: When JSX tag extraction yields empty headings/body (because content was in JSX expressions like `{title}` which get stripped), now searches for string constants: `title: "..."`, `description: "..."`, `heading = "..."` patterns. Last resort: any 30+ char quoted string with spaces.
+- Deployed to Cloudflare Pages. Pushed commit 41f5c2d.
+
+Anchors:
+- `src/lib/github.js` → `isReal()` (fixed), `detectPages()` (label dedup), `extractContentFromSource()` (fallback extraction)

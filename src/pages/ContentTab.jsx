@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   isGitHubConnected, getGitHubToken, setGitHubToken, clearGitHubToken,
   getGitHubUser, listRepos, getRepoTree, detectPages,
-  loadContentJson, saveContentJson, getRepoFile, extractContentFromSource,
+  loadContentJson, saveContentJson, getRepoFile, extractAllContent,
   startGitHubOAuth, handleOAuthCallback
 } from '../lib/github.js'
 import { listAssets } from '../lib/storage.js'
@@ -25,6 +25,8 @@ export default function ContentTab({ project }) {
   const [assets, setAssets] = useState([])
   const [pickingFor, setPickingFor] = useState(null) // field key waiting for image pick
   const [dirty, setDirty] = useState(false)
+  const [showSource, setShowSource] = useState(false)
+  const [pageSources, setPageSources] = useState({})
 
   useEffect(() => {
     // Handle OAuth callback if returning from GitHub
@@ -86,25 +88,20 @@ export default function ContentTab({ project }) {
   }
 
   async function buildSectionsFromSource(pages, repo, branch) {
-    // Fetch all page files in parallel for speed
+    const sources = {}
     const results = await Promise.all(pages.map(async (p) => {
-      let ex = { title: '', heading: '', subheading: '', bodyText: '', heroImage: '' }
+      let fields = []
       try {
         const file = await getRepoFile(repo, p.path, branch)
-        if (file) ex = extractContentFromSource(file.content, p.path)
+        if (file) {
+          sources[p.name] = file.content
+          fields = extractAllContent(file.content, p.path)
+        }
       } catch { /* ignore fetch errors */ }
-      return {
-        page: p.name,
-        pageLabel: p.label,
-        fields: [
-          { key: 'title', label: 'Page title', type: 'text', value: ex.title || p.label },
-          { key: 'hero_heading', label: 'Hero heading', type: 'text', value: ex.heading },
-          { key: 'hero_subheading', label: 'Hero subheading', type: 'textarea', value: ex.subheading },
-          { key: 'hero_image', label: 'Hero image', type: 'image', value: ex.heroImage, width: 1920, height: 600 },
-          { key: 'body_text', label: 'Body text', type: 'textarea', value: ex.bodyText },
-        ]
-      }
+      if (fields.length === 0) fields = [{ key: 'title', label: 'Page title', type: 'text', value: p.label }]
+      return { page: p.name, pageLabel: p.label, fields }
     }))
+    setPageSources(sources)
     return results
   }
 
@@ -278,10 +275,20 @@ export default function ContentTab({ project }) {
                 <>
                   <div style={styles.fieldPanelHeader}>
                     <span style={{ fontSize:15, fontWeight:500 }}>{activeSection.pageLabel}</span>
-                    <button className="btn-ghost" onClick={() => addField(activeSection.page)} style={{ fontSize:12 }}>
-                      + Add field
-                    </button>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button className={showSource ? 'btn-secondary' : 'btn-ghost'} onClick={() => setShowSource(!showSource)} style={{ fontSize:12, padding:'4px 10px' }}>
+                        {showSource ? '✕ Hide source' : '</> Source'}
+                      </button>
+                      <button className="btn-ghost" onClick={() => addField(activeSection.page)} style={{ fontSize:12 }}>
+                        + Add field
+                      </button>
+                    </div>
                   </div>
+                  {showSource && pageSources[activeSection.page] && (
+                    <div style={{ maxHeight:300, overflow:'auto', background:'#0d1117', borderBottom:'1px solid var(--border)' }}>
+                      <pre style={{ color:'#c9d1d9', fontFamily:'var(--mono)', fontSize:12, lineHeight:1.6, padding:'12px 16px', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{pageSources[activeSection.page]}</pre>
+                    </div>
+                  )}
                   {activeSection.fields.map(field => (
                     <FieldEditor
                       key={field.key}
