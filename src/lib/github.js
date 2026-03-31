@@ -1,5 +1,7 @@
 // GitHub API helpers - all done from the browser, no backend needed
 
+import config from '../config.js'
+
 const GH_TOKEN_KEY = 'assethub_github_token'
 const GH_REPOS_KEY = 'assethub_github_repos'
 
@@ -18,6 +20,32 @@ export function clearGitHubToken() {
 
 export function isGitHubConnected() {
   return !!getGitHubToken()
+}
+
+// ── OAuth flow ─────────────────────────────────────────────────
+export function startGitHubOAuth() {
+  const workerUrl = config.workerUrl.replace(/\/$/, '')
+  const appUrl = window.location.origin
+  window.location.href = `${workerUrl}/auth/github?app_url=${encodeURIComponent(appUrl)}`
+}
+
+// Call this on app load to check for OAuth callback token in URL
+export function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('github_token')
+  const error = params.get('github_error')
+
+  if (token) {
+    setGitHubToken(token)
+    // Clean the URL
+    window.history.replaceState({}, '', window.location.pathname)
+    return { success: true }
+  }
+  if (error) {
+    window.history.replaceState({}, '', window.location.pathname)
+    return { success: false, error }
+  }
+  return null // no callback happening
 }
 
 async function ghFetch(path, options = {}) {

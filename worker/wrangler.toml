@@ -11,3 +11,8 @@ bucket_name = "assethub-assets"
 # Set your public bucket URL as an environment variable
 [vars]
 R2_PUBLIC_URL = "https://pub-63cb42e78cd948583c3974681ff3ef47.r2.dev"
+APP_URL = "https://assethub.pgdigitalglobal.com"
+
+# GitHub OAuth - GITHUB_CLIENT_SECRET must be set as a secret via:
+# wrangler secret put GITHUB_CLIENT_SECRET
+GITHUB_CLIENT_ID = "Ov23li4FygzEPyLoz4Hl"

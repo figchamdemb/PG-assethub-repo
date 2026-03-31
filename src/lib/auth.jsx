@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import config from '../config.js'
+import { setGitHubToken } from './github.js'
 
 const AuthContext = createContext(null)
 
@@ -7,6 +9,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Check for GitHub OAuth login callback
+    const params = new URLSearchParams(window.location.search)
+    const ghUserB64 = params.get('github_user')
+    const ghToken = params.get('github_token')
+
+    if (ghUserB64 && ghToken) {
+      try {
+        const ghUser = JSON.parse(atob(ghUserB64))
+        setUser(ghUser)
+        localStorage.setItem('assethub_user', JSON.stringify(ghUser))
+        // Also store the GitHub token so Content Editor is pre-connected
+        setGitHubToken(ghToken)
+      } catch {}
+      // Clean the URL
+      window.history.replaceState({}, '', window.location.pathname)
+      setLoading(false)
+      return
+    }
+
     // Check if we have a stored session
     const stored = localStorage.getItem('assethub_user')
     if (stored) {
@@ -20,10 +41,13 @@ export function AuthProvider({ children }) {
   // CF injects a JWT in the Cf-Access-Jwt-Assertion header.
   // For the demo we use a simple email/password check.
   const loginWithGoogle = () => {
-    // Cloudflare Access redirects to Google automatically
-    // when you visit your Pages URL — no code needed.
-    // This button just initiates the flow.
     window.location.href = '/.cloudflare/access/login'
+  }
+
+  const loginWithGitHub = () => {
+    const workerUrl = config.workerUrl.replace(/\/$/, '')
+    const appUrl = window.location.origin
+    window.location.href = `${workerUrl}/auth/github?app_url=${encodeURIComponent(appUrl)}&purpose=login`
   }
 
   const loginDemo = (email, password) => {
@@ -49,7 +73,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginDemo, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, loginWithGitHub, loginDemo, logout }}>
       {children}
     </AuthContext.Provider>
   )

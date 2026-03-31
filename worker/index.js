@@ -30,6 +30,108 @@ export default {
     const url = new URL(request.url)
     const path = url.pathname
 
+    // ── GET /auth/github ── start OAuth flow ───────────────────
+    if (request.method === 'GET' && path === '/auth/github') {
+      const clientId = env.GITHUB_CLIENT_ID
+      if (!clientId) return err('GITHUB_CLIENT_ID not configured', 500)
+
+      const appUrl = env.APP_URL || url.searchParams.get('app_url') || 'https://assethub-9pf.pages.dev'
+      const purpose = url.searchParams.get('purpose') || 'connect' // 'login' or 'connect'
+      const workerOrigin = url.origin
+
+      // Random state to prevent CSRF
+      const state = crypto.randomUUID()
+      const redirectUri = `${workerOrigin}/auth/github/callback`
+
+      // State payload carries: random|appUrl|purpose
+      const statePayload = `${state}|${appUrl}|${purpose}`
+
+      // Login needs user:email, connect needs repo access
+      const scope = purpose === 'login' ? 'read:user,user:email,repo' : 'repo'
+
+      const ghAuthUrl = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(statePayload)}`
+
+      return new Response(null, {
+        status: 302,
+        headers: { Location: ghAuthUrl },
+      })
+    }
+
+    // ── GET /auth/github/callback ── exchange code for token ───
+    if (request.method === 'GET' && path === '/auth/github/callback') {
+      const code = url.searchParams.get('code')
+      const stateParam = url.searchParams.get('state') || ''
+      if (!code) return err('Missing code parameter')
+
+      const clientId = env.GITHUB_CLIENT_ID
+      const clientSecret = env.GITHUB_CLIENT_SECRET
+      if (!clientId || !clientSecret) return err('OAuth not configured', 500)
+
+      // Parse state payload: random|appUrl|purpose
+      const parts = stateParam.split('|')
+      const appUrl = parts[1]
+      const purpose = parts[2] || 'connect'
+      const redirectTo = appUrl || env.APP_URL || 'https://assethub-9pf.pages.dev'
+
+      // Exchange code for token
+      const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+        }),
+      })
+
+      const tokenData = await tokenRes.json()
+      if (tokenData.error) {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: `${redirectTo}?github_error=${encodeURIComponent(tokenData.error_description || tokenData.error)}` },
+        })
+      }
+
+      const accessToken = tokenData.access_token
+
+      // For login flow: fetch GitHub user profile and redirect with user info + token
+      if (purpose === 'login') {
+        const userRes = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `token ${accessToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'AssetHub',
+          },
+        })
+        const ghUser = await userRes.json()
+
+        // Build minimal user object
+        const user = JSON.stringify({
+          name: ghUser.name || ghUser.login,
+          email: ghUser.email || `${ghUser.login}@github`,
+          avatar: ghUser.avatar_url,
+          login: ghUser.login,
+          provider: 'github',
+          role: 'admin',
+        })
+
+        const encoded = encodeURIComponent(btoa(user))
+        return new Response(null, {
+          status: 302,
+          headers: { Location: `${redirectTo}/login?github_user=${encoded}&github_token=${encodeURIComponent(accessToken)}` },
+        })
+      }
+
+      // For connect flow: redirect with token only
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `${redirectTo}?github_token=${encodeURIComponent(accessToken)}` },
+      })
+    }
+
     // ── GET /projects ──────────────────────────────────────────
     if (request.method === 'GET' && path === '/projects') {
       const obj = await env.BUCKET.get('_meta/projects.json')

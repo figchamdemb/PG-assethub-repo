@@ -24,3 +24,6 @@ Thumbs.db
 
 # Memory-bank generated files
 Memory-bank/_generated/
+
+# Workflow file (needs 'workflow' scope — upload via GitHub web UI)
+.github/workflows/

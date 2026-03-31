@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import {
   isGitHubConnected, getGitHubToken, setGitHubToken, clearGitHubToken,
   getGitHubUser, listRepos, getRepoTree, detectPages,
-  loadContentJson, saveContentJson
+  loadContentJson, saveContentJson,
+  startGitHubOAuth, handleOAuthCallback
 } from '../lib/github.js'
 import { listAssets } from '../lib/storage.js'
 
@@ -10,6 +11,7 @@ export default function ContentTab({ project }) {
   const [connected, setConnected] = useState(isGitHubConnected())
   const [ghUser, setGhUser] = useState(null)
   const [token, setToken] = useState('')
+  const [showPat, setShowPat] = useState(false)
   const [repos, setRepos] = useState([])
   const [selectedRepo, setSelectedRepo] = useState(project.githubRepo || '')
   const [selectedBranch, setSelectedBranch] = useState('main')
@@ -23,6 +25,16 @@ export default function ContentTab({ project }) {
   const [assets, setAssets] = useState([])
   const [pickingFor, setPickingFor] = useState(null) // field key waiting for image pick
   const [dirty, setDirty] = useState(false)
+
+  useEffect(() => {
+    // Handle OAuth callback if returning from GitHub
+    const result = handleOAuthCallback()
+    if (result?.success) {
+      setConnected(true)
+    } else if (result && !result.success) {
+      alert('GitHub connection failed: ' + result.error)
+    }
+  }, [])
 
   useEffect(() => {
     if (connected) loadGitHub()
@@ -129,24 +141,43 @@ export default function ContentTab({ project }) {
           Connect your GitHub account to sync website content — text, headings, and image URLs — directly to your repo. No code editing needed.
         </p>
         <div style={styles.card}>
-          <div style={styles.cardTitle}>Create a Personal Access Token</div>
-          <ol style={{ fontSize:13, color:'var(--text2)', lineHeight:2, paddingLeft:20, marginBottom:16 }}>
-            <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noreferrer" style={{ color:'var(--accent)' }}>github.com/settings/tokens/new</a></li>
-            <li>Name it <code style={styles.code}>assethub</code></li>
-            <li>Check <code style={styles.code}>repo</code> scope</li>
-            <li>Click Generate token and paste it below</li>
-          </ol>
-          <input
-            className="input-field"
-            type="password"
-            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-            value={token}
-            onChange={e => setToken(e.target.value)}
-            style={{ marginBottom:10 }}
-          />
-          <button className="btn-primary" onClick={handleConnect} disabled={!token.trim()}>
-            <GitHubIcon size={14} /> Connect GitHub
-          </button>
+          <div style={{ textAlign:'center', padding:'12px 0 8px' }}>
+            <button className="btn-primary" onClick={startGitHubOAuth} style={{ fontSize:14, padding:'10px 28px', gap:8 }}>
+              <GitHubIcon size={18} /> Connect with GitHub
+            </button>
+            <p style={{ fontSize:12, color:'var(--text3)', marginTop:12, lineHeight:1.6 }}>
+              You'll be redirected to GitHub to authorize AssetHub.<br/>
+              We only request access to your repositories.
+            </p>
+          </div>
+
+          <div style={{ borderTop:'1px solid var(--border)', marginTop:20, paddingTop:16 }}>
+            <button className="btn-ghost" onClick={() => setShowPat(!showPat)} style={{ fontSize:12, color:'var(--text3)' }}>
+              {showPat ? '▾' : '▸'} Connect with Personal Access Token instead
+            </button>
+            {showPat && (
+              <div style={{ marginTop:12 }}>
+                <div style={styles.cardTitle}>Create a Personal Access Token</div>
+                <ol style={{ fontSize:13, color:'var(--text2)', lineHeight:2, paddingLeft:20, marginBottom:16 }}>
+                  <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noreferrer" style={{ color:'var(--accent)' }}>github.com/settings/tokens/new</a></li>
+                  <li>Name it <code style={styles.code}>assethub</code></li>
+                  <li>Check <code style={styles.code}>repo</code> scope</li>
+                  <li>Click Generate token and paste it below</li>
+                </ol>
+                <input
+                  className="input-field"
+                  type="password"
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  value={token}
+                  onChange={e => setToken(e.target.value)}
+                  style={{ marginBottom:10 }}
+                />
+                <button className="btn-primary" onClick={handleConnect} disabled={!token.trim()}>
+                  <GitHubIcon size={14} /> Connect
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     )
