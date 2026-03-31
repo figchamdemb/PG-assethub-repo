@@ -218,7 +218,7 @@ export default {
         const encoded = encodeURIComponent(btoa(user))
         return new Response(null, {
           status: 302,
-          headers: { Location: `${redirectTo}/login?github_user=${encoded}&github_token=${encodeURIComponent(accessToken)}` },
+          headers: { Location: `${redirectTo}/?github_user=${encoded}&github_token=${encodeURIComponent(accessToken)}` },
         })
       }
 

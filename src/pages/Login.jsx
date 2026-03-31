@@ -1,11 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
 
 export default function LoginPage() {
-  const { loginDemo, loginWithGoogle, loginWithGitHub } = useAuth()
+  const { user, loginDemo, loginWithGoogle, loginWithGitHub } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
+
+  // Redirect to dashboard if already authenticated (e.g. after GitHub OAuth callback)
+  useEffect(() => {
+    if (user) navigate('/', { replace: true })
+  }, [user, navigate])
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
