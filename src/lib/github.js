@@ -115,8 +115,12 @@ export async function putRepoFile(repo, path, content, message, sha, branch = 'm
 // Detect pages from repo tree
 export function detectPages(tree) {
   const pageExt = /\.(html|jsx|tsx|vue|astro|svelte)$/
-  // Non-page filenames and directories to skip
+  // Non-page filenames to skip (internal app / framework files)
   const SKIP_NAMES = /^(layout|_layout|_app|_document|app|main|entry|setup|provider|context|store|router|routes|utils|helpers|types|constants|config|middleware|error|loading|not-found)$/i
+  // Component-like names to skip (PascalCase with Tab/Page/View/Modal/Card/List/Form/Panel/Widget suffix)
+  const SKIP_COMPONENT = /^[A-Z].*(?:Tab|Page|View|Modal|Card|List|Form|Panel|Widget|Sidebar|Header|Footer|Nav|Layout|Provider|Context|Dialog|Drawer|Menu|Toolbar|Wrapper)$/
+  // Also skip well-known dashboard/app components
+  const SKIP_APP_NAMES = /^(Dashboard|Login|Signup|Register|Settings|Profile|Admin|Auth|Pricing|Upload|Assets|Content|NotFound|ErrorBoundary)$/i
   const SKIP_DIRS = /\b(lib|utils|hooks|helpers|components|services|store|context|styles|assets|public|node_modules|__tests__|test)\b/i
 
   const pageFiles = tree.filter(f => {
@@ -127,11 +131,22 @@ export function detectPages(tree) {
     const name = filename.replace(pageExt, '')
     // Always skip known non-page names
     if (SKIP_NAMES.test(name)) return false
-    // Files in pages/ or app/ dirs are always included
-    const inPageDir = /\b(pages?|app|views?|routes?)\b/i.test(f.path.replace(filename, ''))
-    if (inPageDir) return true
-    // Root-level HTML files are pages
+    // Skip React/Vue component-like names (PascalCase + UI suffix)
+    if (SKIP_COMPONENT.test(name)) return false
+    // Skip common app dashboard names
+    if (SKIP_APP_NAMES.test(name)) return false
+    // Root-level HTML files are always content pages
     if (parts.length === 1 && /\.html$/.test(filename)) return true
+    // Files in pages/ or app/ dirs — include only if they look like content, not components
+    const inPageDir = /\b(pages?|app|views?|routes?)\b/i.test(f.path.replace(filename, ''))
+    if (inPageDir) {
+      // In a pages dir, only include lowercase/kebab-case names (real routes) or index files
+      if (/^(index|home|about|contact|blog|faq|pricing|services|portfolio|terms|privacy|404|500)$/i.test(name)) return true
+      if (/^[a-z][a-z0-9-]*$/.test(name)) return true // kebab-case route like "about-us"
+      // Skip PascalCase names in pages dirs — likely React components not content pages
+      if (/^[A-Z]/.test(name)) return false
+      return true
+    }
     // Otherwise skip files inside utility directories
     if (SKIP_DIRS.test(f.path)) return false
     return true
