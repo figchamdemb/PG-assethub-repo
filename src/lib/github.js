@@ -174,8 +174,9 @@ export function detectPages(tree) {
         .replace(/^Index$/, 'Home')
     }
 
-    if (seen.has(f.path)) continue
-    seen.add(f.path)
+    const labelKey = label.toLowerCase()
+    if (seen.has(labelKey)) continue
+    seen.add(labelKey)
 
     pages.push({ path: f.path, label, name })
   }
@@ -191,7 +192,12 @@ export function extractContentFromSource(content, filePath) {
   // Collapse whitespace and strip JSX noise from extracted text
   const norm = (s) => s.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/[{}]/g, '').replace(/\s+/g, ' ').trim()
   // Reject strings that look like JS variable references rather than real content
-  const isReal = (s) => s && !/^[a-z_$][a-z0-9_.|\s]*$/i.test(s) && s.length > 1
+  const isReal = (s) => {
+    if (!s || s.length <= 1) return false
+    if (/\s/.test(s.trim())) return true          // multi-word → real content
+    if (/^[a-z_$]/.test(s)) return false           // single lowercase token → likely variable
+    return true                                     // single Capitalized word → real
+  }
   // Reject strings that contain JS code patterns
   const hasCode = (s) => /\b(const |let |var |function |=>|import |require\(|\{\{|\}\}|\.map\(|\.filter\(|\.forEach\()/.test(s)
   const isRealUrl = (s) => s && /^https?:\/\//.test(s)
@@ -253,6 +259,29 @@ export function extractContentFromSource(content, filePath) {
     const imgAll = [...clean.matchAll(/<img[^>]+src=["'{]([^"'}]+)["'}][^>]*\/?>/gi)]
     for (const m of imgAll) {
       if (isRealUrl(m[1])) { result.heroImage = m[1]; break }
+    }
+  }
+
+  // Fallback: extract from string constants when tag-based extraction yielded nothing
+  if (!result.title && ['jsx', 'tsx'].includes(ext)) {
+    const m = clean.match(/<title[^>]*>(.*?)<\/title>/is)
+    if (m) result.title = norm(m[1])
+  }
+  if (!result.heading) {
+    const m = content.match(/(?:title|heading|hero)\w*\s*[:=]\s*["'`]([^"'`\n]{3,})["'`]/i)
+    if (m && isReal(m[1]) && !hasCode(m[1])) result.heading = m[1].trim()
+  }
+  if (!result.bodyText) {
+    const m = content.match(/(?:description|subtitle|subheading|body|snippet|summary)\w*\s*[:=]\s*["'`]([^"'`\n]{15,})["'`]/i)
+    if (m && isReal(m[1]) && !hasCode(m[1])) result.bodyText = m[1].trim()
+  }
+  if (!result.bodyText) {
+    const all = [...content.matchAll(/["'`]([^"'`\n]{30,})["'`]/g)]
+    for (const m of all) {
+      const s = m[1].trim()
+      if (isReal(s) && !hasCode(s) && /\s/.test(s) && !/^[@/.\\#]/.test(s)) {
+        result.bodyText = s; break
+      }
     }
   }
 

@@ -123,3 +123,18 @@ Summary:
 Anchors:
 - `src/pages/Dashboard.jsx` → `handleOAuthCallback` import, `sidebarOpen` state, `.dash-*` CSS classes, `MenuIcon` component
 - `src/index.css` → `.dash-*` layout classes, `@media (max-width: 768px)` responsive rules
+
+### [2026-03-31 18:00 UTC] - copilot
+Scope:
+- Components: frontend (github.js) — Content Editor page detection + extraction
+- Files touched: `src/lib/github.js`
+
+Summary:
+- Fixed GitHub Login button bouncing back: Worker redirects to `/` instead of `/login`, Login page now redirects to `/` if user already authenticated.
+- Fixed `detectPages()` to skip React component files (PascalCase + UI suffix like Tab/Page/Modal/Card etc.), well-known app names (Dashboard, Login, Settings, etc.). Only includes files in `pages/`/`app/` dirs that are kebab-case or known content names.
+- Added **Next.js App Router support**: files named `page.jsx/tsx` are kept (exception to SKIP_NAMES). Labels derived from parent directory name (`app/about/page.tsx` → "About", `app/page.tsx` → "Home").
+- Fixed **JS code leaking into BODY TEXT**: Added `hasCode()` function to reject strings matching JS code patterns (`const `, `let `, `=> `, `.map(`, etc.). Enhanced `clean` pipeline strips JSX expressions `{...}`, single-line `//` comments, and multi-line `/* */` comments. Both HTML and JSX `<p>` matching loops now check `!hasCode(txt)`.
+- Deployed to Cloudflare Pages. Pushed commit ed3a7f1.
+
+Anchors:
+- `src/lib/github.js` → `detectPages()` (SKIP_NAMES, SKIP_COMPONENT, SKIP_APP_NAMES, SKIP_DIRS, Next.js App Router label logic), `extractContentFromSource()` (hasCode(), enhanced clean pipeline)
