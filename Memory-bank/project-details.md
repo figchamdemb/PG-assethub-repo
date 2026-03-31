@@ -50,7 +50,7 @@ AssetHub is a full-stack image/asset management + no-code content editing platfo
 | R2 bucket setup | Done | Platform | 2026-03-31 | assethub-assets, WEUR |
 | Worker deployment | Done | Platform | 2026-03-31 | v1f22de41, wrangler 4.78.0 |
 | React app build + Pages deploy | Done | Platform | 2026-03-31 | dist deployed |
-| Push to GitHub | In Progress | Platform | 2026-03-31 | figchamdemb/PG-assethub-repo |
+| Push to GitHub | Done | Platform | 2026-03-31 | figchamdemb/PG-assethub-repo, commit 246efe7 |
 | Cloudflare Access (Google login) | Planned | Team | TBD | Step 5 in SETUP.md |
 | GitHub content sync per-user | Planned | Team | TBD | Step 6 in SETUP.md |
 
