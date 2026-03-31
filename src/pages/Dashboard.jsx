@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/auth.jsx'
 import { listProjects, createProject, deleteProject } from '../lib/storage.js'
+import { handleOAuthCallback } from '../lib/github.js'
 import UploadTab from './UploadTab.jsx'
 import AssetsTab from './AssetsTab.jsx'
 import ContentTab from './ContentTab.jsx'
@@ -21,8 +22,13 @@ export default function Dashboard() {
   const [newProjectName, setNewProjectName] = useState('')
   const [showNewProject, setShowNewProject] = useState(false)
   const [loadingProjects, setLoadingProjects] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
+    // Capture GitHub OAuth callback token at top level
+    // (user returns here after OAuth, not necessarily on the Content tab)
+    const result = handleOAuthCallback()
+    if (result?.success) setTab('content')
     loadProjects()
   }, [])
 
@@ -69,49 +75,54 @@ export default function Dashboard() {
   const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || 'U'
 
   return (
-    <div style={styles.shell}>
+    <div className="dash-shell">
       {/* Topbar */}
-      <header style={styles.topbar}>
-        <div style={styles.topLogo}>
+      <header className="dash-topbar">
+        <button className="dash-hamburger" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar">
+          <MenuIcon size={18} />
+        </button>
+        <div className="dash-logo">
           <span style={{ color:'var(--accent)' }}>Asset</span>Hub
         </div>
-        <nav style={styles.topNav}>
+        <nav className="dash-nav">
           {NAV.map(n => (
-            <button key={n.id} onClick={() => setTab(n.id)} style={{
-              ...styles.navBtn, ...(tab === n.id ? styles.navBtnActive : {})
-            }}>
+            <button key={n.id} onClick={() => { setTab(n.id); setSidebarOpen(false) }}
+              className={`dash-nav-btn ${tab === n.id ? 'active' : ''}`}>
               <n.icon size={14} />
-              {n.label}
+              <span className="dash-nav-label">{n.label}</span>
             </button>
           ))}
         </nav>
-        <div style={styles.topRight}>            {userPlan && (
-              <span className={`chip chip-${userPlan.plan === 'admin' ? 'purple' : userPlan.plan === 'agency' ? 'green' : userPlan.plan === 'pro' ? 'blue' : 'amber'}`}
-                style={{ cursor: 'pointer' }} onClick={() => setTab('pricing')}>
-                {(userPlan.plan || 'free').toUpperCase()}
-              </span>
-            )}          <div style={styles.avatar} title={user?.email}>{initials}</div>
-          <span style={{ fontSize:12, color:'var(--text2)' }}>{user?.email}</span>
+        <div className="dash-topright">
+          {userPlan && (
+            <span className={`chip chip-${userPlan.plan === 'admin' ? 'purple' : userPlan.plan === 'agency' ? 'green' : userPlan.plan === 'pro' ? 'blue' : 'amber'}`}
+              style={{ cursor: 'pointer' }} onClick={() => setTab('pricing')}>
+              {(userPlan.plan || 'free').toUpperCase()}
+            </span>
+          )}
+          <div className="dash-avatar" title={user?.email}>{initials}</div>
+          <span className="dash-email">{user?.email}</span>
           <button className="btn-ghost" onClick={logout} style={{ fontSize:12, padding:'5px 10px' }}>Sign out</button>
         </div>
       </header>
 
-      <div style={styles.body}>
+      <div className="dash-body">
+        {/* Sidebar overlay for mobile */}
+        {sidebarOpen && <div className="dash-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
         {/* Sidebar */}
-        <aside style={styles.sidebar}>
-          <div style={styles.sidebarSection}>
+        <aside className={`dash-sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div style={{ marginBottom:8 }}>
             <span className="label">Projects</span>
             {loadingProjects
               ? <div style={{ fontSize:12, color:'var(--text3)', padding:'8px 0' }}>Loading…</div>
               : projects.map(proj => (
-                <div key={proj.slug} style={{
-                  ...styles.projItem, ...(activeProject?.slug === proj.slug ? styles.projItemActive : {})
-                }}>
-                  <button onClick={() => setActiveProject(proj)} style={styles.projBtn}>
+                <div key={proj.slug} className={`dash-proj-item ${activeProject?.slug === proj.slug ? 'active' : ''}`}>
+                  <button onClick={() => { setActiveProject(proj); setSidebarOpen(false) }} className="dash-proj-btn">
                     <FolderIcon size={13} />
                     <span style={{ flex:1, textAlign:'left', fontSize:13 }}>{proj.name}</span>
                   </button>
-                  <button onClick={() => handleDeleteProject(proj)} style={styles.projDel} title="Delete project">×</button>
+                  <button onClick={() => handleDeleteProject(proj)} className="dash-proj-del" title="Delete project">×</button>
                 </div>
               ))
             }
@@ -130,7 +141,7 @@ export default function Dashboard() {
                     <button type="button" className="btn-secondary" onClick={() => setShowNewProject(false)} style={{ fontSize:12, padding:'5px 10px' }}>Cancel</button>
                   </div>
                 </form>
-              : <button onClick={() => setShowNewProject(true)} style={styles.newProjBtn}>
+              : <button onClick={() => setShowNewProject(true)} className="dash-new-proj">
                   <PlusIcon size={12} />
                   New project
                 </button>
@@ -138,9 +149,9 @@ export default function Dashboard() {
           </div>
 
           {activeProject && (
-            <div style={{ ...styles.sidebarSection, marginTop:8 }}>
+            <div style={{ marginTop:8 }}>
               <span className="label">Active project</span>
-              <div style={styles.projectInfo}>
+              <div className="dash-proj-info">
                 <div style={{ fontSize:13, fontWeight:500, color:'var(--text)', marginBottom:2 }}>{activeProject.name}</div>
                 <div style={{ fontSize:11, color:'var(--text3)', fontFamily:'var(--mono)' }}>{activeProject.slug}</div>
               </div>
@@ -149,7 +160,7 @@ export default function Dashboard() {
         </aside>
 
         {/* Main content */}
-        <main style={styles.main}>
+        <main className="dash-main">
           {!activeProject && tab !== 'pricing'
             ? <EmptyState onNew={() => setShowNewProject(true)} />
             : tab === 'pricing'
@@ -175,66 +186,6 @@ function EmptyState({ onNew }) {
   )
 }
 
-const styles = {
-  shell: { display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' },
-  topbar: {
-    display:'flex', alignItems:'center', gap:20, padding:'0 20px',
-    height:52, borderBottom:'1px solid var(--border)',
-    background:'var(--bg2)', flexShrink:0,
-  },
-  topLogo: { fontSize:16, fontWeight:600, letterSpacing:'-0.02em', color:'var(--text)', marginRight:8 },
-  topNav: { display:'flex', gap:2, flex:1 },
-  navBtn: {
-    display:'flex', alignItems:'center', gap:6,
-    padding:'6px 12px', borderRadius:'var(--r)', fontSize:13,
-    color:'var(--text2)', transition:'background .12s, color .12s', border:'none', background:'none',
-  },
-  navBtnActive: { background:'var(--bg3)', color:'var(--text)', fontWeight:500 },
-  topRight: { display:'flex', alignItems:'center', gap:10 },
-  avatar: {
-    width:28, height:28, borderRadius:'50%',
-    background:'var(--accent-dim)', color:'var(--accent)',
-    display:'flex', alignItems:'center', justifyContent:'center',
-    fontSize:11, fontWeight:600,
-  },
-  body: { display:'flex', flex:1, overflow:'hidden' },
-  sidebar: {
-    width:220, borderRight:'1px solid var(--border)',
-    background:'var(--bg2)', padding:'16px 12px',
-    overflowY:'auto', flexShrink:0,
-  },
-  sidebarSection: { marginBottom:8 },
-  projItem: {
-    display:'flex', alignItems:'center',
-    borderRadius:'var(--r)', marginBottom:1,
-    transition:'background .12s',
-  },
-  projItemActive: { background:'var(--accent-dim)' },
-  projBtn: {
-    display:'flex', alignItems:'center', gap:7, flex:1,
-    padding:'7px 8px', color:'var(--text2)', fontSize:13,
-    background:'none', border:'none', cursor:'pointer', borderRadius:'var(--r)',
-  },
-  projDel: {
-    padding:'4px 6px', color:'var(--text3)', fontSize:15,
-    background:'none', border:'none', cursor:'pointer', borderRadius:'var(--r)',
-    opacity:0, transition:'opacity .12s',
-    ':hover': { opacity:1 }
-  },
-  newProjBtn: {
-    display:'flex', alignItems:'center', gap:6,
-    width:'100%', padding:'7px 8px', marginTop:4,
-    fontSize:12, color:'var(--text3)', borderRadius:'var(--r)',
-    border:'1px dashed var(--border2)', background:'none', cursor:'pointer',
-    transition:'background .12s, color .12s',
-  },
-  projectInfo: {
-    padding:'10px 10px', background:'var(--bg3)',
-    borderRadius:'var(--r)', border:'1px solid var(--border)',
-  },
-  main: { flex:1, overflowY:'auto', padding:'24px' },
-}
-
 // SVG icons
 function UploadIcon({ size = 16 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -253,4 +204,7 @@ function PlusIcon({ size = 16 }) {
 }
 function CreditCardIcon({ size = 16 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+}
+function MenuIcon({ size = 16 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
 }

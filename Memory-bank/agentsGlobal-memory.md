@@ -110,3 +110,16 @@ Summary:
 Anchors:
 - `src/lib/github.js` → `extractContentFromSource()`, improved `detectPages()`
 - `src/pages/ContentTab.jsx` → `buildSectionsFromSource()`, `getRepoFile` + `extractContentFromSource` import
+
+### [2026-03-31 17:15 UTC] - copilot
+Scope:
+- Components: frontend (Dashboard, index.css)
+- Files touched: `src/pages/Dashboard.jsx`, `src/index.css`
+
+Summary:
+- Made Dashboard fully mobile responsive. Replaced all inline `styles.xxx` with CSS classes `.dash-xxx`. Added `@media (max-width: 768px)` breakpoint: hamburger menu (MenuIcon) toggles sidebar as fixed overlay with backdrop, nav labels hidden (icons only), email hidden, reduced padding.
+- Fixed GitHub Connect button: `handleOAuthCallback()` was only called in ContentTab's useEffect. After OAuth redirect, Dashboard loads with Upload tab by default → ContentTab never mounts → token never captured from URL. Fix: moved `handleOAuthCallback()` to Dashboard-level useEffect; auto-switches to content tab on success.
+
+Anchors:
+- `src/pages/Dashboard.jsx` → `handleOAuthCallback` import, `sidebarOpen` state, `.dash-*` CSS classes, `MenuIcon` component
+- `src/index.css` → `.dash-*` layout classes, `@media (max-width: 768px)` responsive rules
