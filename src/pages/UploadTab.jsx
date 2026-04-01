@@ -23,6 +23,7 @@ export default function UploadTab({ project }) {
   const selectedPreset = config.sizePresets.find(p => p.id === preset)
   const width = preset === 'custom' ? customW : selectedPreset?.w
   const height = preset === 'custom' ? customH : selectedPreset?.h
+  const isVideo = file && file.type.startsWith('video/')
 
   const handleFile = (f) => {
     if (!f) return
@@ -35,13 +36,21 @@ export default function UploadTab({ project }) {
     setAssetName(name)
     const url = URL.createObjectURL(f)
     setPreview(url)
+    // Auto-detect video → set format and asset type accordingly
+    if (f.type.startsWith('video/')) {
+      const ext = f.name.split('.').pop().toLowerCase()
+      setFormat(ext === 'webm' ? 'webm' : 'mp4')
+      setAssetType('video')
+    } else {
+      setFormat('webp')
+    }
   }
 
   const handleDrop = useCallback((e) => {
     e.preventDefault()
     setDragging(false)
     const f = e.dataTransfer.files[0]
-    if (f && f.type.startsWith('image/')) handleFile(f)
+    if (f && (f.type.startsWith('image/') || f.type.startsWith('video/'))) handleFile(f)
   }, [])
 
   const handleProcess = async () => {
@@ -135,7 +144,7 @@ export default function UploadTab({ project }) {
             <div style={styles.formGroup}>
               <label className="label">Output format</label>
               <div style={styles.fmtRow}>
-                {['webp','png','jpg','svg'].map(f => (
+                {['webp','png','jpg','svg','mp4','webm'].map(f => (
                   <button key={f} onClick={() => setFormat(f)} style={{ ...styles.fmtBtn, ...(format===f ? styles.fmtBtnActive : {}) }}>
                     {f.toUpperCase()}
                   </button>
@@ -189,10 +198,14 @@ export default function UploadTab({ project }) {
           {error && <div style={styles.errorBox}>{error}</div>}
 
           <div style={styles.actionRow}>
-            <button className="btn-secondary" onClick={handleProcess} disabled={!file || processing}>
-              {processing ? <><span className="spin">↻</span> Processing…</> : '⚙ Compress + resize'}
-            </button>
-            {processedFile && (
+            {isVideo ? (
+              <div style={{ fontSize:12, color:'var(--text3)', flex:1 }}>Videos are uploaded as-is (no browser compression)</div>
+            ) : (
+              <button className="btn-secondary" onClick={handleProcess} disabled={!file || processing}>
+                {processing ? <><span className="spin">↻</span> Processing…</> : '⚙ Compress + resize'}
+              </button>
+            )}
+            {processedFile && !isVideo && (
               <button className="btn-ghost" onClick={handleDownload} title="Download compressed file">
                 <DownloadIcon size={14} /> Download
               </button>
@@ -208,7 +221,9 @@ export default function UploadTab({ project }) {
           <label className="label">Preview</label>
           <div style={styles.previewBox}>
             {(processedPreview || preview)
-              ? <img src={processedPreview || preview} alt="preview" style={styles.previewImg} />
+              ? isVideo
+                ? <video src={processedPreview || preview} controls muted style={{ maxWidth:'100%', maxHeight:320, borderRadius:6 }} />
+                : <img src={processedPreview || preview} alt="preview" style={styles.previewImg} />
               : <div style={styles.previewEmpty}><ImgIcon size={24} /><span>No file selected</span></div>
             }
           </div>

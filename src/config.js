@@ -31,6 +31,7 @@ const config = {
     { id: 'product', label: 'Product' },
     { id: 'avatar', label: 'Avatar' },
     { id: 'banner', label: 'Banner' },
+    { id: 'video', label: 'Video' },
     { id: 'other', label: 'Other' },
   ],
 
@@ -46,6 +47,7 @@ const config = {
     { id: 'banner',     label: 'Banner wide',  w: 1200, h: 300 },
     { id: 'og',         label: 'OG image',     w: 1200, h: 630 },
     { id: 'favicon',    label: 'Favicon',      w: 32,   h: 32 },
+    { id: 'video-bg',   label: 'BG video',     w: null, h: null },
     { id: 'custom',     label: 'Custom',       w: null, h: null },
   ],
 }

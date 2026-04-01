@@ -200,9 +200,11 @@ export default function AssetsTab({ project }) {
               <div key={asset.key} style={styles.card}>
                 <div style={styles.cardImg} onClick={() => setViewAsset(asset)}>
                   {asset.url
-                    ? <img src={asset.url} alt={asset.name} style={styles.thumbImg}
-                        onLoad={e => { const w = e.target.naturalWidth, h = e.target.naturalHeight; if (w && h) setImgDims(d => ({ ...d, [asset.key]: { w, h } })) }}
-                        onError={e => e.target.style.display='none'} />
+                    ? /\.(mp4|webm|mov)$/i.test(asset.url.split('?')[0])
+                      ? <video src={asset.url} muted style={styles.thumbImg} onLoadedMetadata={e => { const w = e.target.videoWidth, h = e.target.videoHeight; if (w && h) setImgDims(d => ({ ...d, [asset.key]: { w, h } })) }} />
+                      : <img src={asset.url} alt={asset.name} style={styles.thumbImg}
+                          onLoad={e => { const w = e.target.naturalWidth, h = e.target.naturalHeight; if (w && h) setImgDims(d => ({ ...d, [asset.key]: { w, h } })) }}
+                          onError={e => e.target.style.display='none'} />
                     : <ImgIcon size={28} style={{ color:'var(--text3)' }} />
                   }
                   <span className={`chip ${typeColors[asset.assetType] || 'chip-blue'}`} style={styles.typeBadge}>
@@ -263,7 +265,11 @@ export default function AssetsTab({ project }) {
               <button className="btn-ghost" onClick={() => setViewAsset(null)} style={{ fontSize:18, padding:'4px 10px' }}>×</button>
             </div>
             <div style={styles.modalImg}>
-              {viewAsset.url && <img src={viewAsset.url} alt={viewAsset.name} style={{ maxWidth:'100%', maxHeight:400, objectFit:'contain' }} />}
+              {viewAsset.url && (
+                /\.(mp4|webm|mov)$/i.test(viewAsset.url.split('?')[0]) || viewAsset.format === 'mp4' || viewAsset.format === 'webm'
+                  ? <video src={viewAsset.url} controls style={{ maxWidth:'100%', maxHeight:400 }} />
+                  : <img src={viewAsset.url} alt={viewAsset.name} style={{ maxWidth:'100%', maxHeight:400, objectFit:'contain' }} />
+              )}
             </div>
             <div style={{ padding:'16px', borderTop:'1px solid var(--border)' }}>
               <div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--text2)', background:'var(--bg3)', padding:'8px 12px', borderRadius:'var(--r)', marginBottom:12, wordBreak:'break-all' }}>

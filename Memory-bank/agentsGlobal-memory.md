@@ -198,3 +198,19 @@ Summary:
 
 Anchors:
 - `src/pages/AssetsTab.jsx` → `handleScanRepo()`, `guessAssetType()`, `IMG_EXT`, `repoAssets` state, `tab` state
+
+### [2026-04-01 02:30 UTC] - copilot
+Scope:
+- Components: frontend (AssetsTab, github.js) — Repo image replace + dimensions
+- Files touched: `src/pages/AssetsTab.jsx`, `src/lib/github.js`
+
+Summary:
+- **Repo image Replace**: Users can now click "Replace" on repo images. Opens a RepoReplaceModal with side-by-side current/new preview. Reads the file as base64 via FileReader, fetches the current SHA via `getRepoFile()`, then commits the new image via `putRepoFileBinary()`. The replacement is a direct Git commit to the repo.
+- **`putRepoFileBinary()`**: New function in github.js that accepts already-base64-encoded content (for binary files like images), unlike `putRepoFile()` which text-encodes.
+- **Image dimensions**: Auto-detected via `onLoad` on thumbnail `<img>` elements. Stored in `imgDims` state map. Displayed on cards and in the View modal.
+- **SHA tracking**: Each repo asset now stores its `sha` and `repo` for the replace flow.
+- Deployed to Cloudflare Pages. Pushed commit a0dabe5.
+
+Anchors:
+- `src/lib/github.js` → `putRepoFileBinary()`
+- `src/pages/AssetsTab.jsx` → `RepoReplaceModal`, `replaceRepoAsset` state, `imgDims` state
