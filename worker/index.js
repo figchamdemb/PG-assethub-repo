@@ -285,7 +285,28 @@ export default {
       const metaKey = `_meta/${projectSlug}/assets.json`
       const obj = await env.BUCKET.get(metaKey)
       if (!obj) return json([])
-      return json(JSON.parse(await obj.text()))
+      const list = JSON.parse(await obj.text())
+      // Rewrite old r2.dev URLs to Worker /serve/ URLs
+      const workerUrl = new URL(request.url).origin
+      for (const a of list) {
+        if (a.url && a.url.includes('.r2.dev/')) {
+          a.url = `${workerUrl}/serve/${a.key}`
+        }
+      }
+      return json(list)
+    }
+
+    // ── GET /serve/:project/:filename — serve asset directly from R2 ──
+    if (request.method === 'GET' && path.startsWith('/serve/')) {
+      const key = path.slice('/serve/'.length) // e.g. "my-project/logo.webp"
+      if (!key) return err('Missing key', 400)
+      const obj = await env.BUCKET.get(key)
+      if (!obj) return new Response('Not found', { status: 404, headers: CORS })
+      const headers = new Headers(CORS)
+      headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream')
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      headers.set('ETag', obj.etag)
+      return new Response(obj.body, { headers })
     }
 
     // ── DELETE /assets/:project/:key ───────────────────────────
@@ -345,9 +366,9 @@ export default {
         customMetadata: { assetType, width: String(width), height: String(height), uploadedAt: new Date().toISOString() }
       })
 
-      // Build public URL - set R2_PUBLIC_URL in your Worker env vars
-      const publicBase = env.R2_PUBLIC_URL || `https://pub-REPLACE.r2.dev`
-      const publicUrl = `${publicBase}/${key}`
+      // Build public URL - serve through Worker /serve/ route (no r2.dev dependency)
+      const workerUrl = new URL(request.url).origin
+      const publicUrl = `${workerUrl}/serve/${key}`
 
       // Update asset index
       const metaKey = `_meta/${project}/assets.json`
