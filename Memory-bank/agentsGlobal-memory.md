@@ -184,3 +184,17 @@ Summary:
 Anchors:
 - `src/lib/github.js` → `parseImports()`, `resolveImport()`, `extractAllContent()` (metadata extraction)
 - `src/pages/ContentTab.jsx` → `handleLoadRepo()` (fresh extraction), `buildSectionsFromSource()` (import following)
+
+### [2026-03-31 22:00 UTC] - copilot
+Scope:
+- Components: frontend (AssetsTab) — Browse Assets repo image scanning
+- Files touched: `src/pages/AssetsTab.jsx`
+
+Summary:
+- **Repo image scanning**: Browse Assets now has two tabs — "Uploaded" (CDN assets) and "Repo images" (GitHub repo scan). Users select a repo from a dropdown and click "Scan images". Calls `getRepoTree()` and filters for image extensions (.png/.jpg/.gif/.svg/.webp/.ico/.avif/.bmp).
+- **Image display**: Each repo image shows name, file path, format, size, and raw GitHub URL (`raw.githubusercontent.com`). Grid cards have View and Copy URL buttons but no Replace/Delete (read-only from repo).
+- **Auto-type detection**: `guessAssetType()` assigns types like logo, hero-banner, icon, background based on filename patterns.
+- Deployed to Cloudflare Pages. Pushed commit 34d6840.
+
+Anchors:
+- `src/pages/AssetsTab.jsx` → `handleScanRepo()`, `guessAssetType()`, `IMG_EXT`, `repoAssets` state, `tab` state

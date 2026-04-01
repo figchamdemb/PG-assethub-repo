@@ -112,6 +112,16 @@ export async function putRepoFile(repo, path, content, message, sha, branch = 'm
   })
 }
 
+// Create or update a binary file (image) — content must already be base64
+export async function putRepoFileBinary(repo, path, base64Content, message, sha, branch = 'main') {
+  const body = { message, content: base64Content, branch }
+  if (sha) body.sha = sha
+  return ghFetch(`/repos/${repo}/contents/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
 // Detect pages from repo tree
 export function detectPages(tree) {
   const pageExt = /\.(html|jsx|tsx|vue|astro|svelte)$/

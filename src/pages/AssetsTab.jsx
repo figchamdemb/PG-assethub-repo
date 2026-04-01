@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { listAssets, deleteAsset, uploadAsset, formatBytes } from '../lib/storage.js'
-import { isGitHubConnected, listRepos, getRepoTree } from '../lib/github.js'
+import { isGitHubConnected, listRepos, getRepoTree, getRepoFile, putRepoFileBinary } from '../lib/github.js'
 import config from '../config.js'
 
 const IMG_EXT = /\.(png|jpg|jpeg|gif|svg|webp|ico|avif|bmp)$/i
@@ -30,6 +30,8 @@ export default function AssetsTab({ project }) {
   const [selectedRepo, setSelectedRepo] = useState('')
   const [scanLoading, setScanLoading] = useState(false)
   const [tab, setTab] = useState('uploaded') // 'uploaded' | 'repo'
+  const [replaceRepoAsset, setReplaceRepoAsset] = useState(null)
+  const [imgDims, setImgDims] = useState({}) // key -> { w, h }
 
   useEffect(() => {
     loadAssets()
@@ -65,6 +67,8 @@ export default function AssetsTab({ project }) {
             key: 'repo:' + f.path,
             name: filename,
             path: f.path,
+            repo: selectedRepo,
+            sha: f.sha || null,
             assetType: guessAssetType(f.path),
             format: ext,
             size: f.size || 0,
@@ -196,7 +200,9 @@ export default function AssetsTab({ project }) {
               <div key={asset.key} style={styles.card}>
                 <div style={styles.cardImg} onClick={() => setViewAsset(asset)}>
                   {asset.url
-                    ? <img src={asset.url} alt={asset.name} style={styles.thumbImg} onError={e => e.target.style.display='none'} />
+                    ? <img src={asset.url} alt={asset.name} style={styles.thumbImg}
+                        onLoad={e => { const w = e.target.naturalWidth, h = e.target.naturalHeight; if (w && h) setImgDims(d => ({ ...d, [asset.key]: { w, h } })) }}
+                        onError={e => e.target.style.display='none'} />
                     : <ImgIcon size={28} style={{ color:'var(--text3)' }} />
                   }
                   <span className={`chip ${typeColors[asset.assetType] || 'chip-blue'}`} style={styles.typeBadge}>
@@ -206,7 +212,7 @@ export default function AssetsTab({ project }) {
                 <div style={styles.cardBody}>
                   <div style={styles.cardName} title={asset.name}>{asset.name}</div>
                   <div style={styles.cardMeta}>
-                    {asset.format?.toUpperCase()} · {asset.width && asset.height ? `${asset.width}×${asset.height}` : '—'} · {asset.size ? formatBytes(asset.size) : '—'}
+                    {asset.format?.toUpperCase()} · {(asset.width && asset.height) ? `${asset.width}×${asset.height}` : imgDims[asset.key] ? `${imgDims[asset.key].w}×${imgDims[asset.key].h}` : '—'} · {asset.size ? formatBytes(asset.size) : '—'}
                   </div>
                   {asset.path && <div style={{ fontSize:10, color:'var(--text3)', fontFamily:'var(--mono)', marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={asset.path}>{asset.path}</div>}
                   <div style={styles.urlRow} title={asset.url}>
@@ -222,14 +228,13 @@ export default function AssetsTab({ project }) {
                     >
                       {copied === asset.key ? '✓ Copied' : 'Copy URL'}
                     </button>
-                    {asset.source !== 'repo' && <>
-                      <button style={{ ...styles.actionBtn, ...styles.actionBtnAmber }} onClick={() => setReplaceAsset(asset)}>
-                        Replace
-                      </button>
-                      <button style={{ ...styles.actionBtn, ...styles.actionBtnDanger }} onClick={() => handleDelete(asset)}>
-                        ×
-                      </button>
-                    </>}
+                    {asset.source === 'repo'
+                      ? <button style={{ ...styles.actionBtn, ...styles.actionBtnAmber }} onClick={() => setReplaceRepoAsset(asset)}>Replace</button>
+                      : <>
+                        <button style={{ ...styles.actionBtn, ...styles.actionBtnAmber }} onClick={() => setReplaceAsset(asset)}>Replace</button>
+                        <button style={{ ...styles.actionBtn, ...styles.actionBtnDanger }} onClick={() => handleDelete(asset)}>×</button>
+                      </>
+                    }
                   </div>
                 </div>
               </div>
@@ -251,8 +256,9 @@ export default function AssetsTab({ project }) {
               <div>
                 <div style={{ fontSize:15, fontWeight:500 }}>{viewAsset.name}</div>
                 <div style={{ fontSize:12, color:'var(--text2)', marginTop:2 }}>
-                  {viewAsset.format?.toUpperCase()} · {viewAsset.width}×{viewAsset.height} · {formatBytes(viewAsset.size || 0)}
+                  {viewAsset.format?.toUpperCase()} · {(viewAsset.width && viewAsset.height) ? `${viewAsset.width}×${viewAsset.height}` : imgDims[viewAsset.key] ? `${imgDims[viewAsset.key].w}×${imgDims[viewAsset.key].h}` : '—'} · {formatBytes(viewAsset.size || 0)}
                 </div>
+                {viewAsset.path && <div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--text3)', marginTop:2 }}>{viewAsset.path}</div>}
               </div>
               <button className="btn-ghost" onClick={() => setViewAsset(null)} style={{ fontSize:18, padding:'4px 10px' }}>×</button>
             </div>
@@ -274,7 +280,7 @@ export default function AssetsTab({ project }) {
         </div>
       )}
 
-      {/* Replace modal */}
+      {/* Replace modal (CDN) */}
       {replaceAsset && (
         <ReplaceModal
           asset={replaceAsset}
@@ -283,6 +289,18 @@ export default function AssetsTab({ project }) {
           onReplaced={(updated) => {
             setAssets(a => a.map(x => x.key === updated.key ? updated : x))
             setReplaceAsset(null)
+          }}
+        />
+      )}
+
+      {/* Replace modal (Repo) */}
+      {replaceRepoAsset && (
+        <RepoReplaceModal
+          asset={replaceRepoAsset}
+          onClose={() => setReplaceRepoAsset(null)}
+          onReplaced={(updated) => {
+            setRepoAssets(a => a.map(x => x.key === updated.key ? { ...x, sha: updated.sha, url: updated.url } : x))
+            setReplaceRepoAsset(null)
           }}
         />
       )}
@@ -331,6 +349,100 @@ function ReplaceModal({ asset, project, onClose, onReplaced }) {
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
             <button className="btn-primary" onClick={handleReplace} disabled={!file || uploading}>
               {uploading ? 'Replacing…' : 'Replace asset'}
+            </button>
+            <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RepoReplaceModal({ asset, onClose, onReplaced }) {
+  const [file, setFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [preview, setPreview] = useState(null)
+
+  function handleFileChange(e) {
+    const f = e.target.files[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  async function handleReplace() {
+    if (!file || !asset.repo || !asset.path) return
+    setUploading(true)
+    setError('')
+    try {
+      // We need the current SHA. If asset.sha is from the tree, we need the blob SHA
+      // from the contents API for the update to work.
+      const existing = await getRepoFile(asset.repo, asset.path)
+      const currentSha = existing?.sha
+
+      // Read file as base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          // result is "data:image/png;base64,XXXX" — extract the base64 part
+          const b64 = reader.result.split(',')[1]
+          resolve(b64)
+        }
+        reader.onerror = () => reject(new Error('Could not read file'))
+        reader.readAsDataURL(file)
+      })
+
+      const result = await putRepoFileBinary(
+        asset.repo, asset.path, base64,
+        `Replace ${asset.name} via AssetHub`,
+        currentSha
+      )
+      // Cache-bust the thumbnail URL
+      const newUrl = `https://raw.githubusercontent.com/${asset.repo}/main/${asset.path}?t=${Date.now()}`
+      onReplaced({ ...asset, sha: result.content?.sha, url: newUrl })
+    } catch (e) {
+      setError(e.message || 'Failed to replace image in repo')
+    }
+    setUploading(false)
+  }
+
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={{ ...styles.modal, maxWidth:480 }} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <div style={{ fontSize:14, fontWeight:500 }}>Replace repo image — {asset.name}</div>
+          <button className="btn-ghost" onClick={onClose} style={{ fontSize:18 }}>×</button>
+        </div>
+        <div style={{ padding:'20px' }}>
+          <p style={{ fontSize:13, color:'var(--text2)', marginBottom:8 }}>
+            This will <strong style={{ color:'var(--text)' }}>commit a new version</strong> of this image directly to your GitHub repo at:
+          </p>
+          <div style={{ fontSize:11, fontFamily:'var(--mono)', color:'var(--accent)', background:'var(--bg3)', padding:'6px 10px', borderRadius:'var(--r)', marginBottom:12, wordBreak:'break-all' }}>
+            {asset.path}
+          </div>
+
+          {/* Side-by-side preview */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+            <div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4 }}>Current</div>
+              <div style={{ background:'var(--bg3)', borderRadius:'var(--r)', height:100, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+                <img src={asset.url} alt="current" style={{ maxWidth:'100%', maxHeight:100, objectFit:'contain' }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4 }}>New</div>
+              <div style={{ background:'var(--bg3)', borderRadius:'var(--r)', height:100, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden' }}>
+                {preview ? <img src={preview} alt="new" style={{ maxWidth:'100%', maxHeight:100, objectFit:'contain' }} /> : <span style={{ fontSize:11, color:'var(--text3)' }}>Pick a file</span>}
+              </div>
+            </div>
+          </div>
+
+          <input type="file" accept="image/*" className="input-field" onChange={handleFileChange} style={{ marginBottom:12 }} />
+          {error && <div style={styles.errorBox}>{error}</div>}
+          <div style={{ display:'flex', gap:8, marginTop:8 }}>
+            <button className="btn-primary" onClick={handleReplace} disabled={!file || uploading}>
+              {uploading ? 'Committing…' : 'Replace & commit'}
             </button>
             <button className="btn-secondary" onClick={onClose}>Cancel</button>
           </div>
